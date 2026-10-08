@@ -1,0 +1,42 @@
+{
+  "name": "awty",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.10.1",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "node --watch src/app/server.ts",
+    "build": "prisma generate && tsc -p tsconfig.build.json",
+    "start": "node dist/app/server.js",
+    "start:worker": "node -e \"console.log('start:worker arrives with the worker (TASK-056)')\"",
+    "typecheck": "tsc -p tsconfig.json",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:unit": "vitest run --dir tests/unit --passWithNoTests",
+    "test:integration": "vitest run --dir tests/integration --passWithNoTests",
+    "db:generate": "prisma generate",
+    "db:migrate": "node -e \"console.log('db:migrate arrives with the initial migration (TASK-013)')\"",
+    "openapi:check": "node -e \"console.log('openapi:check arrives with the OpenAPI spec (TASK-028)')\""
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.10.0",
+    "@prisma/client": "^7.10.0",
+    "dotenv": "^18.0.6",
+    "express": "^5.2.1",
+    "pg": "^8.23.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.19.1",
+    "eslint": "^10.12.0",
+    "prisma": "^7.10.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^5.0.3"
+  }
+}
