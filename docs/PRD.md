@@ -246,6 +246,16 @@ failed       => last known progress, according to documented policy
 
 The database/schema and domain layer should protect ID uniqueness, positive duration, progress bounds, and valid statuses.
 
+### Schema decisions (recorded, TASK-011/012)
+
+- **id:** `uuid` primary key with database default `gen_random_uuid()` — safe under concurrent inserts from API and workers.
+- **duration:** `integer` seconds with database `CHECK (duration BETWEEN 1 AND 300)`.
+- **status:** native PostgreSQL enum `TaskStatus ('pending','processing','completed','failed')` — the database rejects unknown states, and lowercase values serialize identically to the API/WS JSON contract.
+- **progress:** `integer`, default `0`, database `CHECK (progress BETWEEN 0 AND 100)`.
+- **timestamps:** `createdAt`/`updatedAt` are non-null (`updatedAt` maintained on every write); `startedAt`/`completedAt`/`failedAt` are nullable.
+- **Cross-field state invariants** (`pending ⇒ progress = 0`, `completed ⇒ progress = 100`): enforced in the domain/state-machine layer, **not** as database CHECKs — workers update status and progress in separate statements, and cross-field checks would reject legitimate intermediate states. The database enforces uniqueness, bounds, and status validity.
+- CHECK constraints and the `task_updates` notification trigger (TASK-014) are hand-written in migration SQL because Prisma's schema language cannot express them; `prisma/migrations/` is the source of truth for those objects.
+
 ## 10. Task State Machine
 
 ```text

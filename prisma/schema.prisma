@@ -6,3 +6,25 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum TaskStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+model Task {
+  id          String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  duration    Int
+  status      TaskStatus @default(pending)
+  progress    Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  startedAt   DateTime?
+  completedAt DateTime?
+  failedAt    DateTime?
+
+  // CHECK constraints for duration/progress bounds live in migration SQL
+  // (prisma/schema cannot express them — see prisma/migrations/*/migration.sql)
+}

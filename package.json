@@ -18,7 +18,7 @@
     "test:unit": "vitest run --dir tests/unit --passWithNoTests",
     "test:integration": "vitest run --dir tests/integration --passWithNoTests",
     "db:generate": "prisma generate",
-    "db:migrate": "node -e \"console.log('db:migrate arrives with the initial migration (TASK-013)')\"",
+    "db:migrate": "prisma migrate dev",
     "openapi:check": "node -e \"console.log('openapi:check arrives with the OpenAPI spec (TASK-028)')\""
   },
   "dependencies": {
