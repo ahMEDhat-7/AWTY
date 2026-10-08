@@ -2,7 +2,7 @@
 
 AWTY is a real-time asynchronous task-processing backend. A client submits a long-running task, immediately receives a task ID, and follows its progress live through a WebSocket connection while PostgreSQL remains the durable source of truth.
 
-**Status:** implementation in progress — documentation phase complete. The execution plan lives in [docs/TASKS.md](docs/TASKS.md).
+**Status:** implementation in progress — foundation and data layer complete, feature layers underway. The execution plan lives in [docs/TASKS.md](docs/TASKS.md).
 
 ## Problem
 
@@ -63,6 +63,19 @@ Detailed diagram: [docs/DESIN.excalidraw](docs/DESIN.excalidraw)
 - Reconnect state synchronization (DB state always authoritative)
 - Failure handling with isolated, controlled task failures
 - Multi-worker-safe processing with guarded state transitions
+
+## Progress
+
+Completed so far (tracked as TASK-001–017 in [docs/TASKS.md](docs/TASKS.md)):
+
+- [x] Documentation synced to recorded decisions (PRD, TASKS)
+- [x] Foundation: Node.js 24 + pnpm 12 + strict TypeScript (zero `any` enforced by lint)
+- [x] Infrastructure gate: `docker compose up` runs `postgres:18-alpine` + `api`, `GET /health` reports `db: connected`
+- [x] Typed environment configuration with fail-fast validation
+- [x] Task schema: UUID PK, status enum, CHECK-constrained duration/progress, state-change `pg_notify` trigger — proven from an empty database
+- [x] Domain model: status types, application types, guarded state transitions with exhaustive tests
+
+Next up: zod validation → REST endpoints → pg-boss queue → worker → WebSocket → recovery → tests → CI/CD → final README/ADRs.
 
 ## API Documentation
 
