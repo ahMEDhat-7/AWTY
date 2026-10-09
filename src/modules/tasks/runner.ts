@@ -1,4 +1,5 @@
 import type { TaskQueuePayloadDto } from "./dto.ts";
+import { calculateProgress, PROGRESS_TICK_MS } from "./progress.ts";
 import type { TaskRepository } from "./repository.ts";
 
 /**
@@ -17,28 +18,37 @@ export function toErrorMessage(cause: unknown): string {
 }
 
 export interface TaskRunnerDeps
-  extends Pick<TaskRepository, "findById" | "markProcessing" | "markCompleted" | "markFailed"> {
+  extends Pick<
+    TaskRepository,
+    "findById" | "markProcessing" | "updateProgress" | "markCompleted" | "markFailed"
+  > {
   /** Injectable timer — unit tests run instantly, the worker injects real timers. */
   sleep(ms: number): Promise<void>;
 }
 
 /**
- * TASK-034/035/036 — the task execution pipeline:
+ * TASK-034/035/036/037/038/040 — the task execution pipeline:
  *
- * load → guarded `pending → processing` → simulate duration → guarded
- * `processing → completed` / `processing → failed`.
+ * load → guarded `pending → processing` → tick simulation with periodic
+ * progress persistence → guarded `processing → completed` / `failed`.
  *
  * - **TASK-034:** the DB-guarded claim decides who proceeds: `markProcessing`
  *   only matches rows still `pending`, so a duplicate or stale delivery
  *   observes `null` and does nothing (PRD §19).
- * - **TASK-035:** the simulation is timer-based (`sleep`), so it never
- *   blocks the event loop; `shouldFail` (PRD §5) fails deterministically
- *   at the halfway point.
- * - **TASK-036:** errors during simulation/completion are caught (as
- *   `unknown`), normalized, and turned into the terminal `failed` state —
- *   one task's failure resolves its own job and cannot take down the
- *   worker process. Errors before the claim has happened (load/claim) are
- *   left to propagate so pg-boss can retry the job — no state was moved yet.
+ * - **TASK-035/037:** the simulation advances in timer ticks (never blocking
+ *   the event loop); each tick evaluates `calculateProgress` from elapsed
+ *   time. `shouldFail` (PRD §5) throws deterministically at the halfway tick.
+ * - **TASK-038:** only *changed* values are persisted — identical progress
+ *   never writes twice. Every durable write flows through the guarded
+ *   UPDATE, which the database trigger turns into a `task_updates`
+ *   notification for the WebSocket layer (TASK-039).
+ * - **TASK-040:** after the final tick, `markCompleted` forces
+ *   `progress = 100` and `completedAt = now`, only from `processing`.
+ * - **TASK-036:** errors after the claim are caught (as `unknown`),
+ *   normalized, and turned into the terminal `failed` state — one task's
+ *   failure settles its own job and cannot take down the worker process.
+ *   Errors before the claim (load/claim) propagate so pg-boss can retry:
+ *   no state has been moved yet.
  */
 export function createTaskRunner(deps: TaskRunnerDeps) {
   return async function runTask(payload: TaskQueuePayloadDto): Promise<void> {
@@ -58,11 +68,32 @@ export function createTaskRunner(deps: TaskRunnerDeps) {
     }
 
     try {
-      if (payload.shouldFail) {
-        await deps.sleep((task.duration * 1000) / 2);
-        throw new Error(`simulated failure mid-run (50% of ${task.duration}s)`);
+      const durationMs = task.duration * 1000;
+      let elapsedMs = 0;
+      let lastPersisted = task.progress;
+
+      for (;;) {
+        await deps.sleep(PROGRESS_TICK_MS);
+        elapsedMs += PROGRESS_TICK_MS;
+
+        if (payload.shouldFail && elapsedMs >= durationMs / 2) {
+          const progress = calculateProgress(elapsedMs, task.duration);
+          throw new Error(
+            `simulated failure mid-run (${progress}% of ${task.duration}s)`,
+          );
+        }
+
+        if (elapsedMs >= durationMs) {
+          break;
+        }
+
+        const progress = calculateProgress(elapsedMs, task.duration);
+        if (progress !== lastPersisted) {
+          await deps.updateProgress(task.id, progress);
+          lastPersisted = progress;
+        }
       }
-      await deps.sleep(task.duration * 1000);
+
       await deps.markCompleted(task.id);
     } catch (cause) {
       await deps.markFailed(task.id);

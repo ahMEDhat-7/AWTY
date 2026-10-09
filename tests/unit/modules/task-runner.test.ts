@@ -42,7 +42,12 @@ function makeHarness(overrides: {
       .mockResolvedValue(
         overrides.claim === undefined ? makeTask({ status: "processing" }) : overrides.claim,
       ),
-    markCompleted: vi.fn().mockResolvedValue(makeTask({ status: "completed", progress: 100 })),
+    updateProgress: vi
+      .fn()
+      .mockResolvedValue(makeTask({ status: "processing" })),
+    markCompleted: vi
+      .fn()
+      .mockResolvedValue(makeTask({ status: "completed", progress: 100 })),
     markFailed: vi.fn().mockResolvedValue(makeTask({ status: "failed" })),
     sleep:
       overrides.sleep ??
@@ -51,20 +56,46 @@ function makeHarness(overrides: {
         return Promise.resolve();
       }),
   };
-  return { deps, run: createTaskRunner(deps), slept };
+  const persisted = (): number[] =>
+    deps.updateProgress.mock.calls.map((call) => call[1] as number);
+  return { deps, run: createTaskRunner(deps), slept, persisted };
 }
 
-describe("task runner (TASK-034/035/036)", () => {
-  it("claims the task, waits out the duration and completes it", async () => {
+describe("task runner (TASK-034/035/036/037/038/040)", () => {
+  it("claims the task, ticks out the duration and completes it", async () => {
     const h = makeHarness();
 
     await h.run(makePayload());
 
     expect(h.deps.findById).toHaveBeenCalledWith(TASK_ID);
     expect(h.deps.markProcessing).toHaveBeenCalledWith(TASK_ID);
-    expect(h.slept).toEqual([10_000]);
+    expect(h.slept).toEqual(Array(10).fill(1000));
     expect(h.deps.markCompleted).toHaveBeenCalledWith(TASK_ID);
     expect(h.deps.markFailed).not.toHaveBeenCalled();
+  });
+
+  it("persists periodic progress once per whole percent (TASK-038)", async () => {
+    const h = makeHarness();
+
+    await h.run(makePayload());
+
+    expect(h.persisted()).toEqual([10, 20, 30, 40, 50, 60, 70, 80, 90]);
+    // The final 100% belongs to completion, not to a progress write.
+    expect(h.deps.updateProgress).not.toHaveBeenCalledWith(TASK_ID, 100);
+  });
+
+  it("never writes the same progress value twice (TASK-038)", async () => {
+    // 300s task: the first three ticks still floor to 0%, so they must not
+    // write — only whole-percent changes are persisted.
+    const h = makeHarness({ task: makeTask({ duration: 300 }) });
+
+    await h.run(makePayload());
+
+    const calls = h.persisted();
+    expect(calls[0]).toBe(1);
+    expect(calls[calls.length - 1]).toBe(99);
+    expect(calls).toEqual([...new Set(calls)]);
+    expect(calls).toEqual([...calls].sort((a, b) => a - b));
   });
 
   it("does nothing when the guarded pending -> processing claim is lost", async () => {
@@ -73,16 +104,20 @@ describe("task runner (TASK-034/035/036)", () => {
     await h.run(makePayload());
 
     expect(h.slept).toEqual([]);
+    expect(h.deps.updateProgress).not.toHaveBeenCalled();
     expect(h.deps.markCompleted).not.toHaveBeenCalled();
     expect(h.deps.markFailed).not.toHaveBeenCalled();
   });
 
-  it("fails deterministically mid-run when shouldFail is set", async () => {
+  it("fails deterministically at the halfway tick when shouldFail is set", async () => {
     const h = makeHarness();
 
     await h.run(makePayload({ shouldFail: true }));
 
-    expect(h.slept).toEqual([5_000]);
+    expect(h.slept).toEqual(Array(5).fill(1000));
+    // Progress of the failing tick itself is never persisted — the task
+    // keeps its last durable progress (40%), per the PRD §5 policy.
+    expect(h.persisted()).toEqual([10, 20, 30, 40]);
     expect(h.deps.markFailed).toHaveBeenCalledWith(TASK_ID);
     expect(h.deps.markCompleted).not.toHaveBeenCalled();
   });

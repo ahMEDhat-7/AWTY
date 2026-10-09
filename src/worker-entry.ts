@@ -18,6 +18,7 @@ const sleep = (ms: number): Promise<void> =>
 const runTask = createTaskRunner({
   findById: (id) => repository.findById(id),
   markProcessing: (id) => repository.markProcessing(id),
+  updateProgress: (id, progress) => repository.updateProgress(id, progress),
   markCompleted: (id) => repository.markCompleted(id),
   markFailed: (id) => repository.markFailed(id),
   sleep,
