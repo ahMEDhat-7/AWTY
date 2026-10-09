@@ -3,6 +3,7 @@ import type { Prisma } from "../generated/prisma/client.ts";
 import { prisma } from "../lib/prisma.ts";
 import { createTasksRouter } from "../modules/tasks/controller.ts";
 import { createCreateTaskService } from "../modules/tasks/service.ts";
+import { mountOpenApi } from "../modules/openapi/swagger.ts";
 import { publishTaskJob } from "../queue/publisher.ts";
 import { httpErrorHandler, notFoundHandler } from "../shared/errors.ts";
 
@@ -20,6 +21,8 @@ export function createApp(): Express {
       res.status(503).json({ status: "degraded", db: "disconnected" });
     }
   });
+
+  mountOpenApi(app);
 
   const createTask = createCreateTaskService({
     runInTransaction: <T,>(fn: (tx: Prisma.TransactionClient) => Promise<T>) =>

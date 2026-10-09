@@ -19,7 +19,7 @@
     "test:integration": "vitest run --dir tests/integration --passWithNoTests",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
-    "openapi:check": "node -e \"console.log('openapi:check arrives with the OpenAPI spec (TASK-028)')\""
+    "openapi:check": "node scripts/openapi-check.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.10.0",
@@ -28,12 +28,15 @@
     "express": "^5.2.1",
     "pg": "^8.23.1",
     "pg-boss": "^12.37.0",
-    "zod": "^4.6.5"
+    "swagger-ui-express": "^5.0.1",
+    "zod": "^4.6.5",
+    "zod-openapi": "^6.0.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/express": "^5.0.6",
     "@types/node": "^24.19.1",
+    "@types/swagger-ui-express": "^4.1.8",
     "eslint": "^10.12.0",
     "prisma": "^7.10.0",
     "typescript": "~6.0.3",

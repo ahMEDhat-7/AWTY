@@ -10,10 +10,32 @@ import {
  * duration only as "seconds", so we fix it to an integer in the range 1..300 —
  * the same bounds the database enforces via CHECK "Task_duration_range".
  */
-export const createTaskBodySchema = z.object({
-  duration: z.number().int().min(1).max(300),
-  shouldFail: z.boolean().optional(),
-});
+export const durationSchema = z
+  .number()
+  .int()
+  .min(1)
+  .max(300)
+  .meta({
+    description:
+      "Task duration in seconds. Integer within 1–300 — a documented assumption, enforced by runtime validation and a database CHECK.",
+    example: 10,
+  });
+
+export const createTaskBodySchema = z
+  .object({
+    duration: durationSchema,
+    shouldFail: z
+      .boolean()
+      .meta({
+        description:
+          "Fail the task mid-run to demonstrate failure handling. Carried only in the queue payload — never persisted on the task.",
+      })
+      .optional(),
+  })
+  .meta({
+    id: "CreateTaskRequest",
+    description: "Task to enqueue. Processing starts asynchronously.",
+  });
 
 /** DTO: validated POST /tasks body. The schema is the single source of truth. */
 export type CreateTaskBodyDto = z.infer<typeof createTaskBodySchema>;
