@@ -13,7 +13,7 @@ let port: number;
 
 beforeAll(async () => {
   server = createServer();
-  gateway = attachWebSocketGateway(server);
+  gateway = attachWebSocketGateway(server, { findTask: () => Promise.resolve(null) });
   port = await new Promise<number>((resolve) => {
     server.listen(0, "127.0.0.1", () => {
       resolve((server.address() as AddressInfo).port);

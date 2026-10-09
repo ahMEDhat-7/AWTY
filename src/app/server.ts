@@ -3,6 +3,7 @@ import { createApp } from "./app.ts";
 import { env } from "../config/env.ts";
 import { prisma } from "../lib/prisma.ts";
 import { attachWebSocketGateway } from "../modules/websocket/gateway.ts";
+import { createTaskRepository } from "../modules/tasks/repository.ts";
 import { ensureQueue } from "../queue/pg-boss.ts";
 
 const app = createApp();
@@ -13,8 +14,17 @@ const server = app.listen(env.PORT, () => {
   void startQueue();
 });
 
-// TASK-044 — the same HTTP server also serves /ws.
-const gateway = attachWebSocketGateway(server);
+// TASK-044 — the same HTTP server also serves /ws; TASK-047 — subscribe
+// synchronizes against DB-authoritative state read through the repository.
+const taskRepository = createTaskRepository(prisma);
+const gateway = attachWebSocketGateway(server, {
+  findTask: async (taskId) => {
+    const task = await taskRepository.findById(taskId);
+    return task === null
+      ? null
+      : { id: task.id, status: task.status, progress: task.progress };
+  },
+});
 
 async function checkDatabase(): Promise<void> {
   try {

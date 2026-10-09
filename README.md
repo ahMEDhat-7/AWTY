@@ -194,7 +194,13 @@ or, if the task finished meanwhile:
 { "type": "state", "taskId": "…", "status": "completed", "progress": 100 }
 ```
 
-Malformed messages produce a structured protocol error and never crash the server. Subscriptions are in-memory only (`Map<taskId, Set<connection>>`); task processing never depends on a connected client.
+Malformed messages produce a structured protocol error and never crash the server:
+
+```json
+{ "type": "error", "error": "validation_failed", "issues": [{ "path": "", "message": "invalid JSON" }] }
+```
+
+Subscribing to an unknown task answers `{ "type": "error", "error": "not_found" }`. Subscriptions are in-memory only (`Map<taskId, Set<connection>>`); task processing never depends on a connected client.
 
 ## Recovery & Concurrency
 

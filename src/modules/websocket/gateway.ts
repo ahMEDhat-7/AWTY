@@ -1,8 +1,13 @@
 import type { Server as HttpServer } from "node:http";
 import { WebSocketServer, type WebSocket } from "ws";
-import { parseWsMessage } from "./dto.ts";
 import { createConnectionManager } from "./connections.ts";
+import { createMessageHandler, type FindTaskSnapshot } from "./handler.ts";
+import type { WsTaskUpdate } from "./protocol.ts";
 import { createSubscriptionManager } from "./subscriptions.ts";
+
+export interface WebSocketGatewayDeps {
+  findTask: FindTaskSnapshot;
+}
 
 /**
  * TASK-044 — WebSocket gateway: attaches a `ws` server to the existing
@@ -11,15 +16,25 @@ import { createSubscriptionManager } from "./subscriptions.ts";
  * route through `connections.remove()`, which also scrubs all of the
  * socket's subscriptions.
  *
- * Message handling (subscribe → state sync, broadcasts, protocol errors)
- * arrives with the protocol phase (TASK-047+). Today inbound frames are
- * parsed and discarded — parsing here already proves the never-crash path
- * (PRD §21): malformed input is a value, not an exception.
+ * Inbound frames go to the protocol handler (TASK-047+), which answers every
+ * failure branch itself; the extra catch here is the last-resort guarantee
+ * that a handler bug cannot crash the process (PRD §21).
+ *
+ * `broadcast` fans an update out to every current subscriber of a task
+ * (TASK-049/050/051); the worker→gateway propagation wiring arrives with
+ * the LISTEN phase (TASK-053).
  */
-export function attachWebSocketGateway(server: HttpServer) {
+export function attachWebSocketGateway(
+  server: HttpServer,
+  deps: WebSocketGatewayDeps,
+) {
   const wss = new WebSocketServer({ server, path: "/ws" });
   const subscriptions = createSubscriptionManager();
   const connections = createConnectionManager(subscriptions);
+  const handleMessage = createMessageHandler({
+    subscriptions,
+    findTask: deps.findTask,
+  });
 
   wss.on("connection", (socket: WebSocket) => {
     connections.add(socket);
@@ -31,11 +46,21 @@ export function attachWebSocketGateway(server: HttpServer) {
         : Array.isArray(raw)
           ? Buffer.concat(raw).toString()
           : Buffer.from(raw).toString();
-      void parseWsMessage(text);
+      void handleMessage(socket, text).catch((cause: unknown) => {
+        console.error("ws: message handling failed", cause);
+      });
     });
   });
 
-  return { wss, connections, subscriptions };
+  /** TASK-049/050/051 — send an update to every current subscriber. */
+  function broadcast(message: WsTaskUpdate): void {
+    const payload = JSON.stringify(message);
+    for (const peer of subscriptions.getSubscribers(message.taskId)) {
+      peer.send(payload);
+    }
+  }
+
+  return { wss, connections, subscriptions, broadcast };
 }
 
 export type WebSocketGateway = ReturnType<typeof attachWebSocketGateway>;
