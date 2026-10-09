@@ -40,5 +40,20 @@ services:
       retries: 12
       start_period: 10s
 
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["node", "dist/worker-entry.js"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://awty:awty@postgres:5432/awty
+    env_file:
+      - path: .env
+        required: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   pgdata:
