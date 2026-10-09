@@ -8,10 +8,11 @@ import type { PrismaClient, Task } from "../../generated/prisma/client.ts";
  * duplicate worker executions cannot perform arbitrary transitions — the
  * guard lives in the database, not only in the domain layer.
  *
- * The factory takes the client as an argument so services/tests choose the
- * wiring; no singleton is imported here (composition happens in the app).
+ * The factory takes the task delegate owner as an argument so services/tests
+ * choose the wiring; `Pick<PrismaClient, "task">` accepts both the root
+ * client and Prisma.TransactionClient. No singleton is imported here.
  */
-export function createTaskRepository(db: PrismaClient) {
+export function createTaskRepository(db: Pick<PrismaClient, "task">) {
   return {
     /** Insert a new task; schema defaults give pending/0%. */
     async create(input: { duration: number }): Promise<Task> {
