@@ -2,11 +2,6 @@ export const TASK_STATUSES = ["pending", "processing", "completed", "failed"] as
 
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
-export interface CreateTaskInput {
-  duration: number;
-  shouldFail?: boolean;
-}
-
 export interface TaskState {
   id: string;
   duration: number;
@@ -34,9 +29,4 @@ export interface TaskResponse {
   startedAt: string | null;
   completedAt: string | null;
   failedAt: string | null;
-}
-
-export interface TaskQueuePayload {
-  taskId: string;
-  shouldFail?: boolean;
 }
