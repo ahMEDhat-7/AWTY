@@ -13,6 +13,7 @@ function assert(condition: unknown, message: string): void {
 
 const paths = openApiDocument.paths ?? {};
 const post = paths["/tasks"]?.post;
+const get = paths["/tasks/{id}"]?.get;
 
 assert(openApiDocument.openapi === "3.1.0", "document must declare OpenAPI 3.1.0");
 assert(openApiDocument.info.title.length > 0, "info.title is required");
@@ -21,5 +22,9 @@ assert(post?.requestBody !== undefined, "POST /tasks must document its request b
 assert(post?.responses?.["201"] !== undefined, "201 response must be documented");
 assert(post?.responses?.["400"] !== undefined, "400 response must be documented");
 assert(post?.responses?.["500"] !== undefined, "500 response must be documented");
+assert(get !== undefined, "GET /tasks/{id} must be documented");
+assert(get?.responses?.["200"] !== undefined, "200 response must be documented for GET /tasks/{id}");
+assert(get?.responses?.["400"] !== undefined, "400 response must be documented for GET /tasks/{id}");
+assert(get?.responses?.["404"] !== undefined, "404 response must be documented for GET /tasks/{id}");
 
-console.log("openapi:check passed — OpenAPI 3.1 document covers POST /tasks");
+console.log("openapi:check passed — OpenAPI 3.1 document covers POST /tasks and GET /tasks/{id}");

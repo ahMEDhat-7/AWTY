@@ -1,8 +1,8 @@
-import type { Prisma } from "../../generated/prisma/client.ts";
-import type { ValidationIssue } from "../../lib/validation.ts";
+import type { Prisma, Task } from "../../generated/prisma/client.ts";
+import { uuidSchema, validationFailure, type ValidationIssue } from "../../lib/validation.ts";
 import { parseCreateTaskBody, type TaskQueuePayloadDto } from "./dto.ts";
 import { createTaskRepository } from "./repository.ts";
-import type { CreateTaskResponse } from "./types.ts";
+import type { CreateTaskResponse, TaskStateResponse } from "./types.ts";
 
 export type CreateTaskResult =
   | { ok: true; task: CreateTaskResponse }
@@ -41,6 +41,47 @@ export function createCreateTaskService(deps: CreateTaskServiceDeps) {
         return created;
       });
       return { ok: true, task: { id: task.id, status: task.status } };
+    } catch (cause) {
+      return { ok: false, kind: "unexpected", cause };
+    }
+  };
+}
+
+export type GetTaskResult =
+  | { ok: true; task: TaskStateResponse }
+  | { ok: false; kind: "validation"; issues: ValidationIssue[] }
+  | { ok: false; kind: "not_found" }
+  | { ok: false; kind: "unexpected"; cause: unknown };
+
+export interface GetTaskServiceDeps {
+  findById(id: string): Promise<Task | null>;
+}
+
+/**
+ * TASK-041 — get-task application service. PostgreSQL is always
+ * authoritative: this reads back exactly what the worker's guarded writes
+ * persisted. The path id is untrusted input — a malformed UUID is a
+ * validation error (400); a well-formed but unknown UUID is not_found (404).
+ */
+export function createGetTaskService(deps: GetTaskServiceDeps) {
+  return async function execute(id: string): Promise<GetTaskResult> {
+    const parsed = uuidSchema.safeParse(id);
+    if (!parsed.success) {
+      return {
+        ok: false,
+        kind: "validation",
+        issues: validationFailure(parsed.error).issues,
+      };
+    }
+    try {
+      const task = await deps.findById(parsed.data);
+      if (task === null) {
+        return { ok: false, kind: "not_found" };
+      }
+      return {
+        ok: true,
+        task: { id: task.id, status: task.status, progress: task.progress },
+      };
     } catch (cause) {
       return { ok: false, kind: "unexpected", cause };
     }

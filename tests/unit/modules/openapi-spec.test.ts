@@ -95,4 +95,75 @@ describe("OpenAPI specification (TASK-027/029)", () => {
       },
     });
   });
+
+  it("documents GET /tasks/{id} with its path parameter and every outcome (TASK-043)", () => {
+    expect(openApiDocument).toMatchObject({
+      paths: {
+        "/tasks/{id}": {
+          get: {
+            operationId: "getTask",
+            parameters: [
+              {
+                in: "path",
+                name: "id",
+                required: true,
+                schema: { type: "string", format: "uuid" },
+              },
+            ],
+            responses: {
+              "200": {
+                content: {
+                  "application/json": {
+                    schema: { $ref: "#/components/schemas/TaskStateResponse" },
+                  },
+                },
+              },
+              "400": {
+                content: {
+                  "application/json": {
+                    schema: {
+                      $ref: "#/components/schemas/ValidationErrorResponse",
+                    },
+                  },
+                },
+              },
+              "404": {
+                content: {
+                  "application/json": {
+                    schema: { $ref: "#/components/schemas/NotFoundResponse" },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it("keeps the documented task-state schema aligned with runtime bounds (TASK-043)", () => {
+    expect(openApiDocument).toMatchObject({
+      components: {
+        schemas: {
+          TaskStateResponse: {
+            type: "object",
+            properties: {
+              id: { type: "string", format: "uuid" },
+              status: {
+                type: "string",
+                enum: ["pending", "processing", "completed", "failed"],
+              },
+              progress: { type: "integer", minimum: 0, maximum: 100 },
+            },
+            required: ["id", "status", "progress"],
+          },
+          NotFoundResponse: {
+            type: "object",
+            properties: { error: { const: "not_found" } },
+            required: ["error"],
+          },
+        },
+      },
+    });
+  });
 });

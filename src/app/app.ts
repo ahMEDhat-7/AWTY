@@ -2,7 +2,11 @@ import express, { type Express } from "express";
 import type { Prisma } from "../generated/prisma/client.ts";
 import { prisma } from "../lib/prisma.ts";
 import { createTasksRouter } from "../modules/tasks/controller.ts";
-import { createCreateTaskService } from "../modules/tasks/service.ts";
+import { createTaskRepository } from "../modules/tasks/repository.ts";
+import {
+  createCreateTaskService,
+  createGetTaskService,
+} from "../modules/tasks/service.ts";
 import { mountOpenApi } from "../modules/openapi/swagger.ts";
 import { publishTaskJob } from "../queue/publisher.ts";
 import { httpErrorHandler, notFoundHandler } from "../shared/errors.ts";
@@ -29,7 +33,11 @@ export function createApp(): Express {
       prisma.$transaction(fn),
     publish: publishTaskJob,
   });
-  app.use("/tasks", createTasksRouter(createTask));
+  const taskRepository = createTaskRepository(prisma);
+  const getTask = createGetTaskService({
+    findById: (id) => taskRepository.findById(id),
+  });
+  app.use("/tasks", createTasksRouter(createTask, getTask));
 
   app.use(notFoundHandler);
   app.use(httpErrorHandler);

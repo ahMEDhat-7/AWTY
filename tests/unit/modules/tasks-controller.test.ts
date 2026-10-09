@@ -5,8 +5,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   createTasksRouter,
   type CreateTaskHandler,
+  type GetTaskHandler,
 } from "../../../src/modules/tasks/controller.ts";
-import type { CreateTaskResult } from "../../../src/modules/tasks/service.ts";
+import type {
+  CreateTaskResult,
+  GetTaskResult,
+} from "../../../src/modules/tasks/service.ts";
 import { httpErrorHandler, notFoundHandler } from "../../../src/shared/errors.ts";
 
 const TASK_ID = "0b7f8f3e-1c2d-4a5b-9e8f-112233445566";
@@ -17,13 +21,21 @@ function resolved(result: CreateTaskResult): CreateTaskHandler {
 
 let currentHandler: CreateTaskHandler = () =>
   Promise.reject(new Error("no handler set"));
+let currentGetHandler: GetTaskHandler = () =>
+  Promise.resolve({ ok: false, kind: "not_found" });
 let server: Server;
 let url: string;
 
 beforeAll(async () => {
   const app = express();
   app.use(express.json());
-  app.use("/tasks", createTasksRouter((body) => currentHandler(body)));
+  app.use(
+    "/tasks",
+    createTasksRouter(
+      (body) => currentHandler(body),
+      (id) => currentGetHandler(id),
+    ),
+  );
   app.use(notFoundHandler);
   app.use(httpErrorHandler);
 
@@ -123,8 +135,83 @@ describe("HTTP error mapping (TASK-026)", () => {
   });
 
   it("answers 404 as JSON for unmatched routes", async () => {
-    const response = await fetch(`${url}/tasks/${TASK_ID}`);
+    const response = await fetch(`${url}/no-such-route`);
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ error: "not_found" });
+  });
+});
+
+describe("GET /tasks/:id controller (TASK-042)", () => {
+  it("answers 200 with the current task state", async () => {
+    currentGetHandler = (): Promise<GetTaskResult> =>
+      Promise.resolve({
+        ok: true,
+        task: { id: TASK_ID, status: "processing", progress: 50 },
+      });
+
+    const response = await fetch(`${url}/tasks/${TASK_ID}`);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      id: TASK_ID,
+      status: "processing",
+      progress: 50,
+    });
+  });
+
+  it("hands the raw path id to the service untouched", async () => {
+    let received: string | undefined;
+    currentGetHandler = (id) => {
+      received = id;
+      return Promise.resolve({ ok: false, kind: "not_found" });
+    };
+
+    const response = await fetch(`${url}/tasks/${TASK_ID}`);
+
+    expect(response.status).toBe(404);
+    expect(received).toBe(TASK_ID);
+  });
+
+  it("maps a malformed id to 400 with issues", async () => {
+    currentGetHandler = (): Promise<GetTaskResult> =>
+      Promise.resolve({
+        ok: false,
+        kind: "validation",
+        issues: [{ path: "", message: "Invalid uuid" }],
+      });
+
+    const response = await fetch(`${url}/tasks/not-a-uuid`);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: "validation_failed",
+      issues: [{ path: "", message: "Invalid uuid" }],
+    });
+  });
+
+  it("maps not_found to 404", async () => {
+    currentGetHandler = (): Promise<GetTaskResult> =>
+      Promise.resolve({ ok: false, kind: "not_found" });
+
+    const response = await fetch(`${url}/tasks/${TASK_ID}`);
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "not_found" });
+  });
+
+  it("maps unexpected failures to 500 without leaking internals", async () => {
+    currentGetHandler = (): Promise<GetTaskResult> =>
+      Promise.resolve({
+        ok: false,
+        kind: "unexpected",
+        cause: new Error("secret connection string in message"),
+      });
+
+    const response = await fetch(`${url}/tasks/${TASK_ID}`);
+    const text = await response.text();
+
+    expect(response.status).toBe(500);
+    expect(JSON.parse(text)).toEqual({ error: "internal_error" });
+    expect(text).not.toContain("secret");
   });
 });

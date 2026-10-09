@@ -43,6 +43,30 @@ const validationErrorResponseSchema = z
     description: "Returned for every 400 response.",
   });
 
+const notFoundResponseSchema = z
+  .object({ error: z.literal("not_found") })
+  .meta({
+    id: "NotFoundResponse",
+    description: "No task exists with the requested id.",
+  });
+
+const taskStateResponseSchema = z
+  .object({
+    id: uuidSchema,
+    status: z.enum(TASK_STATUSES),
+    progress: z.number().int().min(0).max(100),
+  })
+  .meta({
+    id: "TaskStateResponse",
+    description:
+      "Current task state. PostgreSQL is authoritative — poll until status is completed (progress 100) or failed.",
+    example: {
+      id: "0b7f8f3e-1c2d-4a5b-9e8f-112233445566",
+      status: "processing",
+      progress: 50,
+    },
+  });
+
 const errorResponseSchema = z
   .object({
     error: z
@@ -64,6 +88,42 @@ export const openApiDocument = createDocument({
       "Real-time asynchronous task-processing API. Create a task, then follow its progress via GET /tasks/:id or the WebSocket endpoint at /ws.",
   },
   paths: {
+    "/tasks/{id}": {
+      get: {
+        operationId: "getTask",
+        summary: "Read a task",
+        description:
+          "Reads the current task state from PostgreSQL. Poll until status is completed (progress 100) or failed.",
+        requestParams: {
+          path: z.object({
+            id: uuidSchema.meta({
+              description: "Task id (UUID) returned by POST /tasks.",
+              example: "0b7f8f3e-1c2d-4a5b-9e8f-112233445566",
+            }),
+          }),
+        },
+        responses: {
+          "200": {
+            description: "Current task state.",
+            content: {
+              "application/json": { schema: taskStateResponseSchema },
+            },
+          },
+          "400": {
+            description: "Malformed task id — reported as a validation error.",
+            content: {
+              "application/json": { schema: validationErrorResponseSchema },
+            },
+          },
+          "404": {
+            description: "No task with this id.",
+            content: {
+              "application/json": { schema: notFoundResponseSchema },
+            },
+          },
+        },
+      },
+    },
     "/tasks": {
       post: {
         operationId: "createTask",
