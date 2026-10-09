@@ -2,6 +2,7 @@ import "dotenv/config"; // must run before any module reads process.env
 import { createApp } from "./app.ts";
 import { env } from "../config/env.ts";
 import { prisma } from "../lib/prisma.ts";
+import { attachWebSocketGateway } from "../modules/websocket/gateway.ts";
 import { ensureQueue } from "../queue/pg-boss.ts";
 
 const app = createApp();
@@ -11,6 +12,9 @@ const server = app.listen(env.PORT, () => {
   void checkDatabase();
   void startQueue();
 });
+
+// TASK-044 — the same HTTP server also serves /ws.
+const gateway = attachWebSocketGateway(server);
 
 async function checkDatabase(): Promise<void> {
   try {
@@ -34,6 +38,10 @@ async function startQueue(): Promise<void> {
 
 function shutdown(signal: string): void {
   console.log(`${signal} received, shutting down`);
+  for (const client of gateway.wss.clients) {
+    client.terminate();
+  }
+  gateway.wss.close();
   server.close(() => {
     process.exit(0);
   });
