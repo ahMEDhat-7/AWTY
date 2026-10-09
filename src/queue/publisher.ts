@@ -1,10 +1,16 @@
 import { fromPrisma } from "pg-boss";
 import type { Prisma } from "../generated/prisma/client.ts";
 import type { TaskQueuePayloadDto } from "../modules/tasks/dto.ts";
-import { boss, ensureQueue, TASK_QUEUE_NAME } from "./pg-boss.ts";
+import { TASK_QUEUE_NAME } from "./config.ts";
+import { boss, ensureQueue } from "./pg-boss.ts";
 
 /**
- * TASK-024 — enqueue a task job inside the caller's Prisma transaction.
+ * TASK-024/031 — enqueue a task job inside the caller's Prisma transaction.
+ *
+ * The payload is minimal by contract (TASK-031): `{ taskId, shouldFail }`.
+ * `shouldFail` (documented in PRD §5) travels only through the queue — it
+ * is never a column on `Task`, so nothing about the demonstration hook is
+ * persisted.
  *
  * Uses pg-boss's fromPrisma adapter (verified against the installed
  * pg-boss 12.37.0: `send(name, data, { db })` routes the insert through the
