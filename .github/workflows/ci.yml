@@ -47,12 +47,13 @@ jobs:
       DATABASE_URL: postgresql://awty:awty@localhost:5432/awty
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
-        # version comes from `packageManager` in package.json (pnpm 12)
+      - uses: pnpm/action-setup@v6
+        # version comes from `packageManager` in package.json (pnpm 12;
+        # action v6.1.0+ is the first to support pnpm 12)
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
