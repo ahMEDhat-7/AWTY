@@ -1,0 +1,94 @@
+# Build-and-smoke CD (§26/TASK-103): after CI succeeds on main, build the
+# production image and prove it runs end to end. No registry, no push, no
+# hosted target (PRD §5) — the image is the deployable artifact (TASK-102).
+#
+# - postgres → one-shot `migrate deploy` → api + worker run as containers on
+#   a user-defined network, mirroring the docker-compose topology
+#   (deployment-equivalent startup, TASK-105).
+# - Smoke: POST /tasks → poll GET /tasks/:id until completed / progress 100.
+# - Secrets: none beyond the default GITHUB_TOKEN (TASK-104).
+
+name: CD
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-smoke:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # validate the exact commit CI approved, not a later head
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Build production image (no push)
+        run: docker build -t awty:cd .
+
+      - name: Start PostgreSQL and apply migrations from a clean state
+        run: |
+          docker network create awty-cd
+          docker run -d --name postgres --network awty-cd \
+            -e POSTGRES_USER=awty -e POSTGRES_PASSWORD=awty -e POSTGRES_DB=awty \
+            postgres:18-alpine
+          for i in $(seq 1 30); do
+            docker exec postgres pg_isready -U awty -d awty && break
+            sleep 2
+          done
+          docker run --rm --network awty-cd \
+            -e DATABASE_URL=postgresql://awty:awty@postgres:5432/awty \
+            awty:cd node_modules/.bin/prisma migrate deploy
+
+      - name: Start API and worker (one image, two commands)
+        run: |
+          docker run -d --name api --network awty-cd -p 3000:3000 \
+            -e DATABASE_URL=postgresql://awty:awty@postgres:5432/awty \
+            awty:cd
+          docker run -d --name worker --network awty-cd \
+            -e DATABASE_URL=postgresql://awty:awty@postgres:5432/awty \
+            awty:cd node dist/worker-entry.js
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:3000/health && break
+            sleep 2
+          done
+          curl -fsS http://localhost:3000/health | grep -q '"db":"connected"'
+
+      - name: Smoke test (POST /tasks to completed / 100)
+        run: |
+          id=$(curl -fsS -X POST http://localhost:3000/tasks \
+            -H 'Content-Type: application/json' -d '{"duration":3}' \
+            | jq -r '.id')
+          echo "task: $id"
+          body=""
+          for i in $(seq 1 60); do
+            body=$(curl -fsS "http://localhost:3000/tasks/$id")
+            status=$(jq -r '.status' <<<"$body")
+            progress=$(jq -r '.progress' <<<"$body")
+            if [ "$status" = "completed" ] && [ "$progress" = "100" ]; then
+              echo "smoke passed: $body"
+              exit 0
+            fi
+            if [ "$status" = "failed" ]; then
+              echo "task failed: $body"
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "smoke timed out: $body"
+          exit 1
+
+      - name: Container logs (on failure)
+        if: failure()
+        run: |
+          docker logs postgres 2>&1 | tail -20 || true
+          docker logs api 2>&1 | tail -40 || true
+          docker logs worker 2>&1 | tail -40 || true

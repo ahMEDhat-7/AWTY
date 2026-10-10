@@ -213,7 +213,7 @@ Subscribing to an unknown task answers `{ "type": "error", "error": "not_found" 
 ## CI/CD
 
 - **CI** (`.github/workflows/ci.yml`, on pull requests and pushes to `main`): pnpm 12 + Node.js 24 install → Prisma generate/migration validation → typecheck → lint → unit + integration tests → OpenAPI specification check → build. Type errors, lint errors, test failures, or specification failures fail the pipeline.
-- **CD** (`.github/workflows/cd.yml`, on `main`): builds the production Docker image, smoke-runs api + worker against PostgreSQL inside the CI runner (`POST /tasks` → poll `GET /tasks/:id` until `completed` / `progress = 100`), and **never pushes to any registry** — there is intentionally no hosted deployment target. No secrets beyond the default `GITHUB_TOKEN`.
+- **CD** (`.github/workflows/cd.yml`, after CI succeeds on `main`): **built** — the single production Docker image (one image, two commands). **Not deployed** — nothing is pushed to any registry and there is intentionally no hosted deployment target (PRD §5); the image itself is the deployable artifact. **Verified by** a deployment-equivalent smoke run inside the runner: fresh PostgreSQL → migrations from a clean state → `api` + `worker` containers → `POST /tasks` → poll `GET /tasks/:id` until `completed` / `progress = 100`. **Configuration required** — only `DATABASE_URL`; no repository secrets beyond the default `GITHUB_TOKEN` (TASK-104: nothing to store in GitHub Secrets).
 
 ## Documentation
 
