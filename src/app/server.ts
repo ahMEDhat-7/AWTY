@@ -17,8 +17,8 @@ const server = app.listen(env.PORT, () => {
   void startQueue();
 });
 
-// TASK-044 — the same HTTP server also serves /ws; TASK-047 — subscribe
-// synchronizes against DB-authoritative state read through the repository.
+// The same HTTP server also serves /ws; subscribe synchronizes against
+// DB-authoritative state read through the repository.
 const taskRepository = createTaskRepository(prisma);
 const findTask: FindTaskSnapshot = async (taskId) => {
   const task = await taskRepository.findById(taskId);
@@ -28,7 +28,7 @@ const findTask: FindTaskSnapshot = async (taskId) => {
 };
 const gateway = attachWebSocketGateway(server, { findTask });
 
-// TASK-053 — dedicated LISTEN client: worker updates flow
+// Dedicated LISTEN client: worker updates flow
 // trigger → listener → gateway.broadcast → subscribers (hints only).
 const listener = startTaskUpdateListener({
   createClient: () => new Client({ connectionString: env.DATABASE_URL }),

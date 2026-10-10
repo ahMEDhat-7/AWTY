@@ -7,16 +7,20 @@ export const boss = new PgBoss({ connectionString: env.DATABASE_URL });
 let queueReady: Promise<void> | undefined;
 
 /**
- * Start pg-boss (schema migration + queue cache) and ensure the task queue
- * exists with its TASK-030 policy — send() fails fast when the queue is
+ * Starts pg-boss (schema migration + queue cache) and ensures the task
+ * queue exists with its policy — `send()` fails fast when the queue is
  * missing. Memoized, and the memo is cleared on failure so a later call
- * retries. Verified against the installed pg-boss 12.37.0: start() and
- * createQueue() are idempotent (create_queue uses ON CONFLICT DO NOTHING).
+ * retries. Against the installed pg-boss 12.37.0, `start()` and
+ * `createQueue()` are idempotent (create_queue uses ON CONFLICT DO
+ * NOTHING).
  *
- * Because of that ON CONFLICT DO NOTHING, createQueue() cannot apply
- * options to a queue that already exists — so updateQueue() (an idempotent
- * UPDATE) follows it, leaving fresh volumes and pre-existing queues with
- * the same heartbeat/retry/expiry policy.
+ * Because of that ON CONFLICT DO NOTHING, `createQueue()` cannot apply
+ * options to a queue that already exists — so `updateQueue()` (an
+ * idempotent UPDATE) follows it, leaving fresh volumes and pre-existing
+ * queues with the same heartbeat/retry/expiry policy.
+ *
+ * @returns resolves once pg-boss is started and the queue exists with its
+ *          policy; rejects on the first failure
  */
 export function ensureQueue(): Promise<void> {
   if (queueReady === undefined) {

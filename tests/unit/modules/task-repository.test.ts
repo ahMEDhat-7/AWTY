@@ -39,7 +39,7 @@ function makeDb(updateCount = 1, row: Task | null = taskRow()) {
   return { repo, create, findUnique, updateMany };
 }
 
-describe("task repository (TASK-021)", () => {
+describe("task repository", () => {
   it("creates a task from the duration only", async () => {
     const { repo, create } = makeDb();
     const result = await repo.create({ duration: 25 });
@@ -80,7 +80,7 @@ describe("task repository (TASK-021)", () => {
   });
 });
 
-describe("guarded updates (TASK-022)", () => {
+describe("guarded updates", () => {
   it("markProcessing only moves a task that is still pending", async () => {
     const { repo, updateMany } = makeDb(1);
     await repo.markProcessing(TASK_ID);
@@ -146,7 +146,7 @@ describe("guarded updates (TASK-022)", () => {
     expect(await repo.markFailed(TASK_ID)).toBeNull();
   });
 
-  it("restartProcessing resets a processing task to 0% with a fresh startedAt (TASK-061/062)", async () => {
+  it("restartProcessing resets a processing task to 0% with a fresh startedAt", async () => {
     const { repo, updateMany } = makeDb(1, taskRow({ status: "processing", progress: 40 }));
 
     const result = await repo.restartProcessing(TASK_ID);

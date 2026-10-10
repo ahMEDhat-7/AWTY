@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { calculateProgress } from "../../../src/modules/tasks/progress.ts";
 
-describe("progress calculation (TASK-037)", () => {
+describe("progress calculation", () => {
   it("floors elapsed over duration", () => {
     expect(calculateProgress(0, 10)).toBe(0);
     expect(calculateProgress(1000, 10)).toBe(10);
@@ -10,7 +10,7 @@ describe("progress calculation (TASK-037)", () => {
   });
 
   it("never rounds up", () => {
-    // 49.9% floors to 49 — PRD §14 uses floor(), not round().
+    // 49.9% floors to 49 — progress uses floor(), not round().
     expect(calculateProgress(4999, 10)).toBe(49);
   });
 
@@ -25,7 +25,7 @@ describe("progress calculation (TASK-037)", () => {
 
   it("stays within database bounds for long tasks", () => {
     // 300s is the maximum duration; early ticks floor to 0 and only whole
-    // percent changes ever get persisted (TASK-038).
+    // percent changes ever get persisted.
     expect(calculateProgress(1000, 300)).toBe(0);
     expect(calculateProgress(39_000, 300)).toBe(13);
     expect(calculateProgress(300_000, 300)).toBe(100);

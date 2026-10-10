@@ -28,7 +28,7 @@ function setup(findTask?: FindTaskSnapshot) {
   return { subscriptions, handler };
 }
 
-describe("websocket message handler (TASK-047/048/052)", () => {
+describe("websocket message handler", () => {
   it("registers the subscription and answers subscribe with a state sync message", async () => {
     const { subscriptions, handler } = setup();
     const { peer, sent } = makePeer();

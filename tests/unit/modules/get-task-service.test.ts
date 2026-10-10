@@ -19,7 +19,7 @@ function makeTask(overrides: Partial<Task> = {}): Task {
   };
 }
 
-describe("get-task service (TASK-041)", () => {
+describe("get-task service", () => {
   it("returns the current state from PostgreSQL", async () => {
     const findById = vi
       .fn()

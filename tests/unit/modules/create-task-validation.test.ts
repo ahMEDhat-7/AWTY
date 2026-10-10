@@ -8,7 +8,7 @@ const MIGRATIONS_DIR = path.resolve(
   "../../../prisma/migrations",
 );
 
-describe("create task body validation (TASK-018)", () => {
+describe("create task body validation", () => {
   it("accepts durations at both documented bounds", () => {
     expect(parseCreateTaskBody({ duration: 1 })).toEqual({
       ok: true,

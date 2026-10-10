@@ -6,7 +6,7 @@ function makePeer() {
   return { send: (): void => undefined };
 }
 
-describe("connection manager (TASK-045)", () => {
+describe("connection manager", () => {
   it("tracks live connections", () => {
     const manager = createConnectionManager(createSubscriptionManager());
 

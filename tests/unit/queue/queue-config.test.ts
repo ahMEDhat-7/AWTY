@@ -6,7 +6,7 @@ import {
   taskJobExpireSeconds,
 } from "../../../src/queue/config.ts";
 
-describe("pg-boss configuration (TASK-030)", () => {
+describe("pg-boss configuration", () => {
   it("names the task queue", () => {
     expect(TASK_QUEUE_NAME).toBe("awty-tasks");
   });
@@ -24,7 +24,7 @@ describe("pg-boss configuration (TASK-030)", () => {
     expect(TASK_QUEUE_OPTIONS.expireInSeconds).toBeGreaterThan(300);
   });
 
-  it("sizes each job's expiry to its own duration plus a margin (TASK-061)", () => {
+  it("sizes each job's expiry to its own duration plus a margin", () => {
     // SendOptions extends QueueOptions in pg-boss 12.37.0, so this
     // per-job value overrides the queue-level fallback: even the longest
     // task's job stays within it, while a short task's job is reclaimed

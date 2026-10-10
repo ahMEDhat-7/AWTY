@@ -1,17 +1,17 @@
-# Quality gate (§25/TASK-097): every push to main and every pull request runs
+# Quality gate: every push to main and every pull request runs
 # generate → validate → typecheck → lint → build → migrate → tests → OpenAPI.
 #
 # Design notes:
 # - pnpm comes from `packageManager` in package.json (pnpm 12), Node from
-#   `.nvmrc`-style pin below (Node 24) — TASK-101: the pnpm store cache is the
-#   only cache, kept because it speeds installs without extra config.
+#   the pin below (Node 24) — the pnpm store cache is the only cache, kept
+#   because it speeds installs without extra config.
 # - `pnpm build` runs before the tests so `dist/` exists: the stack E2E suite
 #   (tests/integration/stack-e2e.test.ts) spawns dist/worker-entry.js and
 #   would otherwise self-skip in CI.
-# - PostgreSQL 18 runs as a job service (TASK-098); migrations are applied
-#   from a clean state with `prisma migrate deploy` (TASK-099).
+# - PostgreSQL 18 runs as a job service; migrations are applied
+#   from a clean state with `prisma migrate deploy`.
 # - `pnpm lint` enforces the zero-`any` policy (`no-explicit-any: error`) and
-#   `pnpm typecheck` rejects type errors — TASK-100.
+#   `pnpm typecheck` rejects type errors.
 
 name: CI
 

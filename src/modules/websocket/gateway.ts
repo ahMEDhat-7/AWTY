@@ -10,19 +10,22 @@ export interface WebSocketGatewayDeps {
 }
 
 /**
- * TASK-044 — WebSocket gateway: attaches a `ws` server to the existing
- * Express HTTP server at `/ws` and owns the connection lifecycle
- * (TASK-045): every accepted socket is tracked, and `close`/`error` both
- * route through `connections.remove()`, which also scrubs all of the
- * socket's subscriptions.
+ * Attaches a `ws` server to the existing Express HTTP server at `/ws`.
  *
- * Inbound frames go to the protocol handler (TASK-047+), which answers every
- * failure branch itself; the extra catch here is the last-resort guarantee
- * that a handler bug cannot crash the process (PRD §21).
+ * Owns the connection lifecycle: every accepted socket is tracked, and
+ * `close`/`error` both route through `connections.remove()`, which also
+ * scrubs all of the socket's subscriptions.
  *
- * `broadcast` fans an update out to every current subscriber of a task
- * (TASK-049/050/051); the worker→gateway propagation wiring arrives with
- * the LISTEN phase (TASK-053).
+ * Inbound frames go to the protocol handler, which answers every failure
+ * branch itself; the extra catch here is the last-resort guarantee that a
+ * handler bug cannot crash the process.
+ *
+ * `broadcast` fans an update out to every current subscriber of a task;
+ * the worker→gateway propagation is wired through the LISTEN listener.
+ *
+ * @param server - the HTTP server the gateway shares with the REST API
+ * @param deps - `findTask`, the DB-authoritative snapshot reader
+ * @returns the gateway handle: `wss`, `connections`, `subscriptions`, `broadcast`
  */
 export function attachWebSocketGateway(
   server: HttpServer,
@@ -52,7 +55,12 @@ export function attachWebSocketGateway(
     });
   });
 
-  /** TASK-049/050/051 — send an update to every current subscriber. */
+  /**
+   * Sends an update to every current subscriber.
+   *
+   * @param message - the task-addressed update to fan out
+   * @returns nothing; each subscriber socket receives the JSON payload
+   */
   function broadcast(message: WsTaskUpdate): void {
     const payload = JSON.stringify(message);
     for (const peer of subscriptions.getSubscribers(message.taskId)) {

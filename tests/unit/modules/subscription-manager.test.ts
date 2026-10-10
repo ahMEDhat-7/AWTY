@@ -9,7 +9,7 @@ function makePeer(): { peer: WsPeer; sent: string[] } {
   return { peer: { send: (data) => void sent.push(data) }, sent };
 }
 
-describe("subscription manager (TASK-046)", () => {
+describe("subscription manager", () => {
   it("registers subscribers per task", () => {
     const manager = createSubscriptionManager();
     const { peer } = makePeer();
@@ -62,7 +62,7 @@ describe("subscription manager (TASK-046)", () => {
     expect(manager.getSubscribers("task-a")).toEqual([peer]);
   });
 
-  it("returns no subscribers for a task nobody is watching (TASK-075)", () => {
+  it("returns no subscribers for a task nobody is watching", () => {
     const manager = createSubscriptionManager();
     const { peer } = makePeer();
     manager.subscribe("task-a", peer);

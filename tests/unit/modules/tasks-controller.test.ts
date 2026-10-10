@@ -52,7 +52,7 @@ afterAll(async () => {
   });
 });
 
-describe("POST /tasks controller (TASK-025)", () => {
+describe("POST /tasks controller", () => {
   it("answers 201 with { id, status } immediately", async () => {
     currentHandler = resolved({
       ok: true,
@@ -82,7 +82,7 @@ describe("POST /tasks controller (TASK-025)", () => {
   });
 });
 
-describe("HTTP error mapping (TASK-026)", () => {
+describe("HTTP error mapping", () => {
   it("maps validation failures to 400 with issues", async () => {
     currentHandler = resolved({
       ok: false,
@@ -141,7 +141,7 @@ describe("HTTP error mapping (TASK-026)", () => {
   });
 });
 
-describe("GET /tasks/:id controller (TASK-042)", () => {
+describe("GET /tasks/:id controller", () => {
   it("answers 200 with the current task state", async () => {
     currentGetHandler = (): Promise<GetTaskResult> =>
       Promise.resolve({

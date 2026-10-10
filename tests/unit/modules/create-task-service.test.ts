@@ -57,7 +57,7 @@ function makeHarness(options?: {
   return { service, publish, create, tx, stats };
 }
 
-describe("create-task service (TASK-023)", () => {
+describe("create-task service", () => {
   it("creates a pending task, enqueues its job and returns the id", async () => {
     const h = makeHarness();
     const result = await h.service({ duration: 10 });
@@ -70,7 +70,7 @@ describe("create-task service (TASK-023)", () => {
     expect(h.publish).toHaveBeenCalledWith(
       h.tx,
       { taskId: TASK_ID, shouldFail: false },
-      // TASK-061 — the job expiry is sized to this task's duration.
+      // The job expiry is sized to this task's duration.
       { durationSeconds: 10 },
     );
     expect(h.stats.transactions).toBe(1);
@@ -129,7 +129,7 @@ describe("create-task service (TASK-023)", () => {
   });
 });
 
-describe("create-task service (TASK-024 consistency)", () => {
+describe("create-task service", () => {
   it("surfaces a queue failure as unexpected (transaction rolls back)", async () => {
     const boom = new Error("pg-boss unavailable");
     const h = makeHarness({ publishError: boom });

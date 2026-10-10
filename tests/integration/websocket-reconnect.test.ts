@@ -92,8 +92,8 @@ async function subscribe(
   return nextMessage(socket);
 }
 
-describe("websocket reconnection (TASK-056…059)", () => {
-  it("TASK-056: resubscribe after a drop returns fresh state and keeps updates flowing", async () => {
+describe("websocket reconnection", () => {
+  it("resubscribe after a drop returns fresh state and keeps updates flowing", async () => {
     const taskId = randomUUID();
     seed({ id: taskId, status: "pending", progress: 0 });
 
@@ -129,7 +129,7 @@ describe("websocket reconnection (TASK-056…059)", () => {
     second.close();
   });
 
-  it("TASK-056: resubscribing on the same connection re-sends state without duplicating the subscription", async () => {
+  it("resubscribing on the same connection re-sends state without duplicating the subscription", async () => {
     const taskId = randomUUID();
     seed({ id: taskId, status: "processing", progress: 40 });
 
@@ -147,7 +147,7 @@ describe("websocket reconnection (TASK-056…059)", () => {
     await waitFor(() => gateway.connections.count() === 0);
   });
 
-  it("TASK-057: reconnect mid-processing returns the current persisted progress (20% → 60%)", async () => {
+  it("reconnect mid-processing returns the current persisted progress (20% → 60%)", async () => {
     const taskId = randomUUID();
     seed({ id: taskId, status: "processing", progress: 20 });
 
@@ -174,7 +174,7 @@ describe("websocket reconnection (TASK-056…059)", () => {
     second.close();
   });
 
-  it("TASK-058: a task completed while disconnected is discovered as completed/100 on reconnect", async () => {
+  it("a task completed while disconnected is discovered as completed/100 on reconnect", async () => {
     const taskId = randomUUID();
     seed({ id: taskId, status: "processing", progress: 25 });
 
@@ -197,7 +197,7 @@ describe("websocket reconnection (TASK-056…059)", () => {
     second.close();
   });
 
-  it("TASK-059: a task failed while disconnected is recovered as failed with progress preserved", async () => {
+  it("a task failed while disconnected is recovered as failed with progress preserved", async () => {
     const taskId = randomUUID();
     seed({ id: taskId, status: "processing", progress: 40 });
 
@@ -206,7 +206,7 @@ describe("websocket reconnection (TASK-056…059)", () => {
     first.close();
     await waitFor(() => gateway.connections.count() === 0);
 
-    // Failure keeps the last durable progress (PRD §5).
+    // Failure keeps the last durable progress.
     tasks.set(taskId, { id: taskId, status: "failed", progress: 40 });
 
     const second = await openClient();

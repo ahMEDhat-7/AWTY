@@ -12,7 +12,12 @@ export type ParseResult<T> =
 /** Shared UUID schema for task ids appearing in WS messages and queue payloads. */
 export const uuidSchema = z.uuid();
 
-/** Map a zod failure onto the shared failure branch. Never throws. */
+/**
+ * Maps a zod failure onto the shared failure branch.
+ *
+ * @param error - the zod error to convert
+ * @returns `{ ok: false, issues }` with dotted paths; never throws
+ */
 export function validationFailure(error: z.ZodError): {
   ok: false;
   issues: ValidationIssue[];

@@ -3,7 +3,7 @@ import { parseWsMessage } from "../../../src/modules/websocket/dto.ts";
 
 const TASK_ID = "0b7f8f3e-1c2d-4a5b-9e8f-112233445566";
 
-describe("websocket inbound validation (TASK-019)", () => {
+describe("websocket inbound validation", () => {
   it("parses a valid subscribe message into the typed protocol union", () => {
     const frame = JSON.stringify({ type: "subscribe", taskId: TASK_ID });
     expect(parseWsMessage(frame)).toEqual({
@@ -49,7 +49,7 @@ describe("websocket inbound validation (TASK-019)", () => {
     }
   });
 
-  it("rejects values of the wrong JSON type (TASK-076)", () => {
+  it("rejects values of the wrong JSON type", () => {
     const wrongTypes = [
       JSON.stringify({ type: 42, taskId: TASK_ID }),
       JSON.stringify({ type: "subscribe", taskId: 42 }),

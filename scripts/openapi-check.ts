@@ -1,8 +1,16 @@
 import { openApiDocument } from "../src/modules/openapi/spec.ts";
 
 /**
- * CI check (TASK-029): the OpenAPI document must be 3.1, must document
- * POST /tasks, and must cover every outcome the API implements.
+ * OpenAPI CI check: the document must be 3.1, must document POST /tasks,
+ * and must cover every outcome the API implements.
+ */
+
+/**
+ * Fails the check when a requirement does not hold.
+ *
+ * @param condition - the requirement to assert
+ * @param message - the failure text printed to stderr
+ * @returns nothing; exits the process with code 1 when the condition fails
  */
 function assert(condition: unknown, message: string): void {
   if (!condition) {

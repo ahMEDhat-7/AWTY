@@ -21,11 +21,15 @@ export interface CreateTaskServiceDeps {
 }
 
 /**
- * TASK-023/024 — create-task application service.
+ * Builds the create-task application service.
  *
  * validate → create pending task → enqueue job → return task ID.
  * The insert and the queue publication share one transaction, so the task
  * row and its pg-boss job commit atomically (or not at all).
+ *
+ * @param deps - the transaction runner and the queue publisher to use
+ * @returns an async executor that turns a raw request body into a
+ *          `CreateTaskResult`
  */
 export function createCreateTaskService(deps: CreateTaskServiceDeps) {
   return async function execute(body: unknown): Promise<CreateTaskResult> {
@@ -44,7 +48,7 @@ export function createCreateTaskService(deps: CreateTaskServiceDeps) {
             taskId: created.id,
             shouldFail: parsed.data.shouldFail ?? false,
           },
-          // TASK-061 — the job's expiry is sized to this task's duration.
+          // The job's expiry is sized to this task's duration.
           { durationSeconds: parsed.data.duration },
         );
         return created;
@@ -67,10 +71,13 @@ export interface GetTaskServiceDeps {
 }
 
 /**
- * TASK-041 — get-task application service. PostgreSQL is always
+ * Builds the get-task application service. PostgreSQL is always
  * authoritative: this reads back exactly what the worker's guarded writes
  * persisted. The path id is untrusted input — a malformed UUID is a
  * validation error (400); a well-formed but unknown UUID is not_found (404).
+ *
+ * @param deps - the repository lookup the service reads through
+ * @returns an async executor that turns a raw path id into a `GetTaskResult`
  */
 export function createGetTaskService(deps: GetTaskServiceDeps) {
   return async function execute(id: string): Promise<GetTaskResult> {

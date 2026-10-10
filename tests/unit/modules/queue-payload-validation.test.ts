@@ -3,7 +3,7 @@ import { parseQueuePayload } from "../../../src/modules/tasks/dto.ts";
 
 const TASK_ID = "0b7f8f3e-1c2d-4a5b-9e8f-112233445566";
 
-describe("queue payload validation (TASK-020)", () => {
+describe("queue payload validation", () => {
   it("accepts a well-formed job payload", () => {
     expect(parseQueuePayload({ taskId: TASK_ID })).toEqual({
       ok: true,

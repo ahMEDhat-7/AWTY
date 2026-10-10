@@ -1,12 +1,12 @@
-# Build-and-smoke CD (§26/TASK-103): after CI succeeds on main, build the
+# Build-and-smoke CD: after CI succeeds on main, build the
 # production image and prove it runs end to end. No registry, no push, no
-# hosted target (PRD §5) — the image is the deployable artifact (TASK-102).
+# hosted target — the image is the deployable artifact.
 #
 # - postgres → one-shot `migrate deploy` → api + worker run as containers on
 #   a user-defined network, mirroring the docker-compose topology
-#   (deployment-equivalent startup, TASK-105).
+#   (deployment-equivalent startup).
 # - Smoke: POST /tasks → poll GET /tasks/:id until completed / progress 100.
-# - Secrets: none beyond the default GITHUB_TOKEN (TASK-104).
+# - Secrets: none beyond the default GITHUB_TOKEN.
 
 name: CD
 

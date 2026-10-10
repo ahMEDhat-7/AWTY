@@ -8,7 +8,7 @@ const MIGRATIONS_DIR = path.resolve(
   "../../../prisma/migrations",
 );
 
-describe("task status (TASK-015)", () => {
+describe("task status", () => {
   it("exposes exactly the four PRD states in order", () => {
     expect([...TASK_STATUSES]).toEqual([
       "pending",

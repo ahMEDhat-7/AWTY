@@ -5,9 +5,9 @@ import { createTaskBodySchema } from "../tasks/dto.ts";
 import { TASK_STATUSES } from "../tasks/types.ts";
 
 /**
- * TASK-027/029 — OpenAPI 3.1 document generated from the SAME zod schemas
- * used for runtime validation. This module never re-describes validation
- * rules; it only registers paths and response shapes.
+ * OpenAPI 3.1 document generated from the SAME zod schemas used for
+ * runtime validation. This module never re-describes validation rules;
+ * it only registers paths and response shapes.
  */
 
 const createTaskResponseSchema = z

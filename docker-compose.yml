@@ -20,7 +20,7 @@ services:
 
   # One-shot init job: applies Prisma migrations, then exits 0. api and
   # worker wait for it (service_completed_successfully), which is what makes
-  # `docker compose up` sufficient even on an empty volume (TASK-092/093).
+  # `docker compose up` sufficient even on an empty volume.
   migrate:
     build:
       context: .

@@ -11,7 +11,7 @@ import type { TaskStateResponse } from "../../../src/modules/tasks/types.ts";
 
 const TASK_ID = "33333333-3333-4333-8333-333333333333";
 
-/** The TASK-014 trigger's payload shape; contents are only a hint. */
+/** The database trigger's payload shape; contents are only a hint. */
 function hintPayload(taskId: string): string {
   return JSON.stringify({ id: taskId, status: "processing", progress: 10 });
 }
@@ -98,7 +98,7 @@ function deliver(client: FakeClient, payload: string | undefined): void {
   client.emit("notification", { channel: TASK_UPDATES_CHANNEL, payload });
 }
 
-describe("task update listener (TASK-053/054)", () => {
+describe("task update listener", () => {
   it("connects a dedicated client and listens on the task_updates channel", async () => {
     const { clients, listener } = startFakeListener();
 

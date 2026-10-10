@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { openApiDocument } from "../../../src/modules/openapi/spec.ts";
 
-describe("OpenAPI specification (TASK-027/029)", () => {
+describe("OpenAPI specification", () => {
   it("is a well-formed OpenAPI 3.1 document", () => {
     expect(openApiDocument.openapi).toBe("3.1.0");
     expect(openApiDocument.info.title).toBe("AWTY API");
@@ -96,7 +96,7 @@ describe("OpenAPI specification (TASK-027/029)", () => {
     });
   });
 
-  it("documents GET /tasks/{id} with its path parameter and every outcome (TASK-043)", () => {
+  it("documents GET /tasks/{id} with its path parameter and every outcome", () => {
     expect(openApiDocument).toMatchObject({
       paths: {
         "/tasks/{id}": {
@@ -141,7 +141,7 @@ describe("OpenAPI specification (TASK-027/029)", () => {
     });
   });
 
-  it("keeps the documented task-state schema aligned with runtime bounds (TASK-043)", () => {
+  it("keeps the documented task-state schema aligned with runtime bounds", () => {
     expect(openApiDocument).toMatchObject({
       components: {
         schemas: {

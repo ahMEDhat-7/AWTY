@@ -16,7 +16,7 @@ function isValidPair(from: TaskStatus, to: TaskStatus): boolean {
   return VALID.some(([validFrom, validTo]) => validFrom === from && validTo === to);
 }
 
-describe("state transitions (TASK-017)", () => {
+describe("state transitions", () => {
   it.each(VALID)("allows %s -> %s", (from, to) => {
     expect(canTransition(from, to)).toBe(true);
     const result: StateTransitionResult = checkTransition({ from, to });

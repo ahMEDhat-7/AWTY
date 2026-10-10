@@ -1,34 +1,50 @@
 /**
- * TASK-046 — the connection port shared by both managers: the minimal
- * surface they rely on, so the managers stay testable with plain fakes and
- * are never coupled to the `ws` package.
+ * The connection port shared by both managers: the minimal surface they
+ * rely on, so the managers stay testable with plain fakes and are never
+ * coupled to the `ws` package.
  */
 export interface WsPeer {
   send(data: string): void;
 }
 
 /**
- * TASK-046 — in-memory subscription manager (PRD §16):
+ * Builds the in-memory subscription manager:
  *
  *   Map(TaskId, Set<Connection>)
  *
  * In-memory only and never load-bearing for processing: PostgreSQL owns
  * durable state; this map only routes live updates to live sockets.
+ *
+ * @returns the manager of subscribe/unsubscribe/getSubscribers/removeConnection
  */
 export function createSubscriptionManager() {
   const subscriptions = new Map<string, Set<WsPeer>>();
 
   return {
+    /**
+     * Registers a peer for a task's updates.
+     *
+     * @param taskId - the task's UUID
+     * @param peer - the subscriber socket (a duplicate subscribe is a no-op)
+     * @returns nothing
+     */
     subscribe(taskId: string, peer: WsPeer): void {
       let peers = subscriptions.get(taskId);
       if (peers === undefined) {
         peers = new Set();
         subscriptions.set(taskId, peers);
       }
-      peers.add(peer); // Set: a duplicate subscribe is a no-op
+      peers.add(peer);
     },
 
-    /** TASK-046: unsubscribe is supported even though the protocol barely needs it. */
+    /**
+     * Drops one peer's registration for a task. Supported even though the
+     * protocol barely needs it.
+     *
+     * @param taskId - the task's UUID
+     * @param peer - the peer to unsubscribe
+     * @returns nothing; empty subscription sets are deleted
+     */
     unsubscribe(taskId: string, peer: WsPeer): void {
       const peers = subscriptions.get(taskId);
       if (peers === undefined) {
@@ -40,13 +56,23 @@ export function createSubscriptionManager() {
       }
     },
 
-    /** Snapshot copy — callers can never corrupt the manager's state. */
+    /**
+     * Reads the current subscribers of a task.
+     *
+     * @param taskId - the task's UUID
+     * @returns a snapshot copy — callers can never corrupt the manager's state
+     */
     getSubscribers(taskId: string): WsPeer[] {
       const peers = subscriptions.get(taskId);
       return peers === undefined ? [] : [...peers];
     },
 
-    /** TASK-045: a dropped connection leaves every subscription set at once. */
+    /**
+     * Removes a dropped connection from every subscription set at once.
+     *
+     * @param peer - the connection that closed
+     * @returns nothing
+     */
     removeConnection(peer: WsPeer): void {
       for (const [taskId, peers] of subscriptions) {
         peers.delete(peer);

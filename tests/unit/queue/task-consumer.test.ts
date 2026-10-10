@@ -23,7 +23,7 @@ function makeJob(data: unknown): Job<TaskQueuePayloadDto> {
   } as unknown as Job<TaskQueuePayloadDto>;
 }
 
-describe("worker consumer (TASK-032)", () => {
+describe("worker consumer", () => {
   it("runs the task for a valid queue payload", async () => {
     const execute = vi.fn().mockResolvedValue(undefined);
     const handler = createTaskJobHandler(execute as TaskExecutor);

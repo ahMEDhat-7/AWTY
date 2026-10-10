@@ -14,17 +14,22 @@ export interface MessageHandlerDeps {
 }
 
 /**
- * TASK-047/048/052 — the WebSocket protocol handler.
+ * Builds the WebSocket protocol handler.
  *
- * `subscribe` follows the task's flow: validate → register the subscription →
- * read the current state → send the `state` synchronization message. The
- * registration deliberately happens *before* the read: an update committed in
- * between is then still broadcast to this socket, so a reconnecting client can
- * never end up stuck on a stale terminal state (PRD §17).
+ * `subscribe` follows the task's flow: validate → register the
+ * subscription → read the current state → send the `state`
+ * synchronization message. The registration deliberately happens
+ * *before* the read: an update committed in between is then still
+ * broadcast to this socket, so a reconnecting client can never end up
+ * stuck on a stale terminal state.
  *
- * Every failure branch answers with a structured protocol error instead of
- * throwing; the handler never rejects, so a single bad frame can never take
- * the process down (PRD §21).
+ * Every failure branch answers with a structured protocol error instead
+ * of throwing; the handler never rejects, so a single bad frame can never
+ * take the process down.
+ *
+ * @param deps - the subscription manager and the snapshot reader
+ * @returns an async handler that processes one raw frame and replies on
+ *          the socket; it never rejects
  */
 export function createMessageHandler(deps: MessageHandlerDeps) {
   return async function handleMessage(

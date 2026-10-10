@@ -6,9 +6,13 @@ export type CreateTaskHandler = (body: unknown) => Promise<CreateTaskResult>;
 export type GetTaskHandler = (id: string) => Promise<GetTaskResult>;
 
 /**
- * TASK-025/026/042 — task controllers. They validate nothing themselves:
- * raw input goes to the service (DTO at the boundary), and every outcome
- * maps to a status code — POST: 201/400/500; GET: 200/400/404/500.
+ * Builds the task routers. They validate nothing themselves: raw input
+ * goes to the service (DTO at the boundary), and every outcome maps to a
+ * status code — POST: 201/400/500; GET: 200/400/404/500.
+ *
+ * @param createTask - the create-task service handler
+ * @param getTask - the get-task service handler
+ * @returns an Express router serving `POST /` and `GET /:id`
  */
 export function createTasksRouter(
   createTask: CreateTaskHandler,

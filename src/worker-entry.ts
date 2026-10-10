@@ -6,9 +6,9 @@ import { boss } from "./queue/pg-boss.ts";
 import { startTaskConsumer } from "./queue/worker.ts";
 
 /**
- * TASK-033 — the worker entrypoint: an independent process in the same
- * package and image as the API (`node dist/worker-entry.js`). It consumes
- * queue jobs; the API never does.
+ * The worker entrypoint: an independent process in the same package and
+ * image as the API (`node dist/worker-entry.js`). It consumes queue jobs;
+ * the API never does.
  */
 const repository = createTaskRepository(prisma);
 
@@ -18,8 +18,8 @@ const sleep = (ms: number): Promise<void> =>
 const runTask = createTaskRunner({
   findById: (id) => repository.findById(id),
   markProcessing: (id) => repository.markProcessing(id),
-  // TASK-061/062 — crash recovery: a redelivered job for a task stuck in
-  // `processing` restarts the simulation from 0% (ADR-005).
+  // Crash recovery: a redelivered job for a task stuck in `processing`
+  // restarts the simulation from 0%.
   restartProcessing: (id) => repository.restartProcessing(id),
   updateProgress: (id, progress) => repository.updateProgress(id, progress),
   markCompleted: (id) => repository.markCompleted(id),

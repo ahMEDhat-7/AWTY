@@ -65,7 +65,7 @@ function makeHarness(overrides: {
   return { deps, run: createTaskRunner(deps), slept, persisted };
 }
 
-describe("task runner (TASK-034/035/036/037/038/040)", () => {
+describe("task runner", () => {
   it("claims the task, ticks out the duration and completes it", async () => {
     const h = makeHarness();
 
@@ -80,7 +80,7 @@ describe("task runner (TASK-034/035/036/037/038/040)", () => {
     expect(h.deps.markFailed).not.toHaveBeenCalled();
   });
 
-  it("persists periodic progress once per whole percent (TASK-038)", async () => {
+  it("persists periodic progress once per whole percent", async () => {
     const h = makeHarness();
 
     await h.run(makePayload());
@@ -90,7 +90,7 @@ describe("task runner (TASK-034/035/036/037/038/040)", () => {
     expect(h.deps.updateProgress).not.toHaveBeenCalledWith(TASK_ID, 100);
   });
 
-  it("never writes the same progress value twice (TASK-038)", async () => {
+  it("never writes the same progress value twice", async () => {
     // 300s task: the first three ticks still floor to 0%, so they must not
     // write — only whole-percent changes are persisted.
     const h = makeHarness({ task: makeTask({ duration: 300 }) });
@@ -118,7 +118,7 @@ describe("task runner (TASK-034/035/036/037/038/040)", () => {
     expect(h.deps.markFailed).not.toHaveBeenCalled();
   });
 
-  it("recovers a crashed attempt by restarting the simulation from 0% (TASK-061/062)", async () => {
+  it("recovers a crashed attempt by restarting the simulation from 0%", async () => {
     // A redelivered job whose task is still `processing`: the previous
     // attempt's worker died, so this run takes over from the reset row.
     const h = makeHarness({
@@ -141,7 +141,7 @@ describe("task runner (TASK-034/035/036/037/038/040)", () => {
 
     expect(h.slept).toEqual(Array(5).fill(1000));
     // Progress of the failing tick itself is never persisted — the task
-    // keeps its last durable progress (40%), per the PRD §5 policy.
+    // keeps its last durable progress (40%).
     expect(h.persisted()).toEqual([10, 20, 30, 40]);
     expect(h.deps.markFailed).toHaveBeenCalledWith(TASK_ID);
     expect(h.deps.markCompleted).not.toHaveBeenCalled();
@@ -161,7 +161,7 @@ describe("task runner (TASK-034/035/036/037/038/040)", () => {
     });
 
     // The runner must resolve — a failed task settles its own job and can
-    // never crash the worker process (PRD §13).
+    // never crash the worker process.
     await expect(h.run(makePayload())).resolves.toBeUndefined();
 
     expect(h.deps.markFailed).toHaveBeenCalledWith(TASK_ID);
@@ -169,12 +169,12 @@ describe("task runner (TASK-034/035/036/037/038/040)", () => {
   });
 });
 
-describe("task failure isolation (TASK-063)", () => {
+describe("task failure isolation", () => {
   it("one failing task settles as failed while a concurrent one completes", async () => {
     const TASK_ID_B = "11111111-2222-4333-8444-555555555555";
     // Two jobs, one shared task table: every write is a guarded UPDATE
     // keyed by the task id, so the failing run can only ever touch its own
-    // row (PRD §19).
+    // row.
     const rows = new Map<string, Task>([
       [TASK_ID, makeTask()],
       [TASK_ID_B, makeTask({ id: TASK_ID_B })],
@@ -213,7 +213,7 @@ describe("task failure isolation (TASK-063)", () => {
   });
 });
 
-describe("toErrorMessage (TASK-036)", () => {
+describe("toErrorMessage", () => {
   it("uses the message of real errors", () => {
     expect(toErrorMessage(new Error("boom"))).toBe("boom");
   });
@@ -233,7 +233,7 @@ describe("toErrorMessage (TASK-036)", () => {
     expect(toErrorMessage(undefined)).toBe("unknown error");
   });
 
-  it("normalizes every unknown throwable to a loggable, public-safe string (TASK-077)", () => {
+  it("normalizes every unknown throwable to a loggable, public-safe string", () => {
     // Anything can be thrown in JS. The result must always be a non-empty
     // string that never leaks a spoofed shape: only real Error instances
     // expose their message, everything else falls back to a constant.

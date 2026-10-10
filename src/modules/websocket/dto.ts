@@ -36,10 +36,16 @@ function decodeJson(raw: unknown): DecodeResult {
 }
 
 /**
- * TASK-019 pipeline: unknown frame data -> safe JSON parsing -> runtime schema
- * validation -> discriminated union -> handler. Never throws: malformed data
- * yields the failure branch, which the connection layer turns into a
+ * Parses raw frame data into a typed inbound message.
+ *
+ * Pipeline: unknown frame data -> safe JSON parsing -> runtime schema
+ * validation -> discriminated union -> handler. Never throws: malformed
+ * data yields the failure branch, which the connection layer turns into a
  * structured protocol error without crashing the process.
+ *
+ * @param raw - the frame payload as received on the socket
+ * @returns a discriminated result: `{ ok: true, data }` or
+ *          `{ ok: false, issues }`
  */
 export function parseWsMessage(raw: unknown): ParseResult<WsInboundMessage> {
   const decoded = decodeJson(raw);

@@ -6,9 +6,9 @@ import {
 } from "../../lib/validation.ts";
 
 /**
- * Duration assumption (documented in PRD §9): the source requirement defines
- * duration only as "seconds", so we fix it to an integer in the range 1..300 —
- * the same bounds the database enforces via CHECK "Task_duration_range".
+ * Duration assumption: the source requirement defines duration only as
+ * "seconds", so we fix it to an integer in the range 1..300 — the same
+ * bounds the database enforces via CHECK "Task_duration_range".
  */
 export const durationSchema = z
   .number()
@@ -40,7 +40,13 @@ export const createTaskBodySchema = z
 /** DTO: validated POST /tasks body. The schema is the single source of truth. */
 export type CreateTaskBodyDto = z.infer<typeof createTaskBodySchema>;
 
-/** TASK-018: unknown request body -> validated, typed DTO. Never throws. */
+/**
+ * Validates an unknown request body into a typed DTO.
+ *
+ * @param input - the raw request body (untrusted)
+ * @returns a discriminated result: `{ ok: true, data }` or
+ *          `{ ok: false, issues }`; never throws
+ */
 export function parseCreateTaskBody(input: unknown): ParseResult<CreateTaskBodyDto> {
   const parsed = createTaskBodySchema.safeParse(input);
   if (parsed.success) {
@@ -50,9 +56,10 @@ export function parseCreateTaskBody(input: unknown): ParseResult<CreateTaskBodyD
 }
 
 /**
- * pg-boss payloads are never trusted (TASK-020): the queue may hand us
- * arbitrary data, so every job body is re-validated before use. Unknown keys
- * are stripped; shouldFail lives only in the payload, never on the task row.
+ * Queue job payload schema. pg-boss payloads are never trusted: the queue
+ * may hand us arbitrary data, so every job body is re-validated before
+ * use. Unknown keys are stripped; shouldFail lives only in the payload,
+ * never on the task row.
  */
 export const taskQueuePayloadSchema = z.object({
   taskId: uuidSchema,
@@ -62,6 +69,13 @@ export const taskQueuePayloadSchema = z.object({
 /** DTO: validated queue job payload derived from its schema. */
 export type TaskQueuePayloadDto = z.infer<typeof taskQueuePayloadSchema>;
 
+/**
+ * Validates an unknown queue job body into a typed DTO.
+ *
+ * @param input - the job's `data` payload (untrusted)
+ * @returns a discriminated result: `{ ok: true, data }` or
+ *          `{ ok: false, issues }`; never throws
+ */
 export function parseQueuePayload(input: unknown): ParseResult<TaskQueuePayloadDto> {
   const parsed = taskQueuePayloadSchema.safeParse(input);
   if (parsed.success) {

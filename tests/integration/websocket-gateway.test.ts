@@ -51,7 +51,7 @@ async function waitFor(condition: () => boolean, timeoutMs = 2000): Promise<void
   }
 }
 
-describe("websocket gateway (TASK-044/045)", () => {
+describe("websocket gateway", () => {
   it("accepts connections at /ws and tracks them", async () => {
     const a = await openClient();
     const b = await openClient();
@@ -69,8 +69,8 @@ describe("websocket gateway (TASK-044/045)", () => {
   });
 
   it("cleans a connection's subscriptions when it drops", async () => {
-    // The subscribe protocol arrives in TASK-047; subscribe the server-side
-    // socket directly to pin the disconnect invariant end to end.
+    // Subscribing through the wire protocol is covered elsewhere; subscribe
+    // the server-side socket directly to pin the disconnect invariant end to end.
     let serverSide: WebSocket | undefined;
     const capture = (socket: WebSocket): void => {
       serverSide = socket;
@@ -92,7 +92,7 @@ describe("websocket gateway (TASK-044/045)", () => {
     expect(gateway.subscriptions.getSubscribers("task-x")).toEqual([]);
   });
 
-  it("survives malformed frames and keeps serving (PRD §21)", async () => {
+  it("survives malformed frames and keeps serving", async () => {
     const noisy = await openClient();
     noisy.send("{not json");
     noisy.send(JSON.stringify({ type: "nonsense" }));

@@ -3,9 +3,13 @@ import { calculateProgress, PROGRESS_TICK_MS } from "./progress.ts";
 import type { TaskRepository } from "./repository.ts";
 
 /**
- * TASK-036 — normalize a caught error without assuming its shape. Caught
- * values are `unknown`, and coercions like `String(cause)` can themselves
- * throw on exotic objects, so only safe narrowings are applied.
+ * Normalizes a caught error to a loggable message.
+ *
+ * Caught values are `unknown`, and coercions like `String(cause)` can
+ * themselves throw on exotic objects, so only safe narrowings are applied.
+ *
+ * @param cause - the caught value
+ * @returns the error's message, the string itself, or `"unknown error"`
  */
 export function toErrorMessage(cause: unknown): string {
   if (cause instanceof Error) {
@@ -32,37 +36,40 @@ export interface TaskRunnerDeps
 }
 
 /**
- * TASK-034/035/036/037/038/040 — the task execution pipeline:
+ * Builds the task execution pipeline:
  *
  * load → guarded `pending → processing` → tick simulation with periodic
  * progress persistence → guarded `processing → completed` / `failed`.
  *
- * - **TASK-034:** the DB-guarded claim decides who proceeds: `markProcessing`
- *   only matches rows still `pending`, so a duplicate or stale delivery
- *   observes `null` and does nothing (PRD §19).
- * - **TASK-061/062 (ADR-005):** crash recovery is the claim's second
- *   stage: when the pending claim misses but the task is still
- *   `processing`, `restartProcessing` resets it to 0% and this run takes
- *   over. pg-boss redelivers a job only after the owning worker's
+ * - **Guarded claim:** the DB-guarded claim decides who proceeds:
+ *   `markProcessing` only matches rows still `pending`, so a duplicate or
+ *   stale delivery observes `null` and does nothing.
+ * - **Crash recovery:** when the pending claim misses but the task is
+ *   still `processing`, `restartProcessing` resets it to 0% and this run
+ *   takes over. pg-boss redelivers a job only after the owning worker's
  *   heartbeat has died, so a restart can never race a healthy attempt;
  *   both claims are guarded UPDATEs, so a terminal task is never
- *   resurrected and one failed job can never disturb another (TASK-063).
- * - **TASK-035/037:** the simulation advances in timer ticks (never blocking
- *   the event loop); each tick evaluates `calculateProgress` from elapsed
- *   time. `shouldFail` (PRD §5) throws deterministically at the halfway tick.
- * - **TASK-038:** only *changed* values are persisted — identical progress
+ *   resurrected and one failed job can never disturb another.
+ * - **Simulation:** the run advances in timer ticks (never blocking the
+ *   event loop); each tick evaluates `calculateProgress` from elapsed
+ *   time. `shouldFail` throws deterministically at the halfway tick.
+ * - **Progress:** only *changed* values are persisted — identical progress
  *   never writes twice. Every durable write flows through the guarded
  *   UPDATE, which the database trigger turns into a `task_updates`
- *   notification for the WebSocket layer (TASK-039).
- * - **TASK-040:** after the final tick, `markCompleted` forces
+ *   notification for the WebSocket layer.
+ * - **Completion:** after the final tick, `markCompleted` forces
  *   `progress = 100` and `completedAt = now`, only from `processing`.
- * - **TASK-036/060:** errors after the claim are caught (as `unknown`),
+ * - **Failure boundary:** errors after the claim are caught (as `unknown`),
  *   normalized, and turned into the terminal `failed` state — `failedAt`
- *   is stamped while the last durable progress is preserved (PRD §5).
+ *   is stamped while the last durable progress is preserved.
  *   One task's failure settles its own job and cannot take down the
  *   worker process or any other task.
  *   Errors before the claim (load/claim) propagate so pg-boss can retry:
  *   no state has been moved yet.
+ *
+ * @param deps - repository methods and the injectable timer the run uses
+ * @returns an async runner that executes one validated queue payload to a
+ *          terminal task state
  */
 export function createTaskRunner(deps: TaskRunnerDeps) {
   return async function runTask(payload: TaskQueuePayloadDto): Promise<void> {
@@ -77,14 +84,13 @@ export function createTaskRunner(deps: TaskRunnerDeps) {
     const started = await deps.markProcessing(task.id);
     const claimed = started ?? (await deps.restartProcessing(task.id));
     if (claimed === null) {
-      // TASK-062 — the task is already terminal (completed or failed): a
-      // straggler duplicate delivery settles its job without touching it.
+      // The task is already terminal (completed or failed): a straggler
+      // duplicate delivery settles its job without touching it.
       return;
     }
     if (started === null) {
-      // TASK-061/062 (ADR-005) — recovery of a crashed attempt: restart
-      // the simulation from 0% instead of stranding the task in
-      // `processing` forever.
+      // Recovery of a crashed attempt: restart the simulation from 0%
+      // instead of stranding the task in `processing` forever.
       console.log(`task ${task.id} recovered: restarting from 0%`);
     }
 

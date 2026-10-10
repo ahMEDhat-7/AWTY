@@ -1,5 +1,5 @@
 /**
- * TASK-079…089 — stack integration/E2E: the real Express app (`createApp`),
+ * Stack integration/E2E: the real Express app (`createApp`),
  * real PostgreSQL, real pg-boss queue, the real LISTEN → broadcast pipeline,
  * and a real spawned worker subprocess (`dist/worker-entry.js`) — wired the
  * same way `src/app/server.ts` wires them in production.
@@ -8,8 +8,8 @@
  * - PostgreSQL reachable through DATABASE_URL (.env)
  * - a built worker: `pnpm build` (the suite spawns dist/worker-entry.js)
  * - no other worker-entry process consuming `awty-tasks` — a stray dev
- *   worker would race this suite's worker and make TASK-088's
- *   kill-and-recover scenario non-deterministic.
+ *   worker would race this suite's worker and make the kill-and-recover
+ *   scenario non-deterministic.
  */
 import "dotenv/config"; // must run before any module reads process.env
 import { spawn, type ChildProcess } from "node:child_process";
@@ -246,9 +246,9 @@ async function waitTerminalFrame(handle: WsHandle, timeoutMs: number): Promise<F
 // The suite
 // ---------------------------------------------------------------------------
 
-describe.skipIf(!dbReady || !workerBuilt)("stack E2E (TASK-079…089)", () => {
+describe.skipIf(!dbReady || !workerBuilt)("stack E2E", () => {
   beforeAll(async () => {
-    writeFileSync(WORKER_LOG, ""); // fresh log so TASK-088's assertion is this suite's
+    writeFileSync(WORKER_LOG, ""); // fresh log so the kill-and-recover assertions read only this suite's output
     await ensureQueue();
 
     const app = createApp();
@@ -298,7 +298,7 @@ describe.skipIf(!dbReady || !workerBuilt)("stack E2E (TASK-079…089)", () => {
     await prisma.$disconnect();
   }, 30_000);
 
-  it("serves /docs and /openapi.json against the running app (TASK-089)", async () => {
+  it("serves /docs and /openapi.json against the running app", async () => {
     const specResponse = await fetch(`${base()}/openapi.json`);
     expect(specResponse.status).toBe(200);
     const document = (await specResponse.json()) as {
@@ -317,7 +317,7 @@ describe.skipIf(!dbReady || !workerBuilt)("stack E2E (TASK-079…089)", () => {
     expect(docsResponse.headers.get("content-type")).toContain("text/html");
   }, 15_000);
 
-  it("POST /tasks yields the HTTP response, task row and queue job (TASK-079)", async () => {
+  it("POST /tasks yields the HTTP response, task row and queue job", async () => {
     const created = await postTask({ duration: 4 });
     expect(created.status).toBe(201);
     expect(created.body.status).toBe("pending");
@@ -332,13 +332,13 @@ describe.skipIf(!dbReady || !workerBuilt)("stack E2E (TASK-079…089)", () => {
     expect(jobs[0]?.name).toBe(TASK_QUEUE_NAME);
   }, 15_000);
 
-  it("GET /tasks/:id for a missing task answers 404 not_found (TASK-080)", async () => {
+  it("GET /tasks/:id for a missing task answers 404 not_found", async () => {
     const { status, body } = await fetchTask("00000000-0000-4000-8000-000000000000");
     expect(status).toBe(404);
     expect(body).toEqual({ error: "not_found" });
   }, 10_000);
 
-  it("GET /tasks/:id returns the current persistent state (TASK-080)", async () => {
+  it("GET /tasks/:id returns the current persistent state", async () => {
     const id = idOf((await postTask({ duration: 4 })).body);
     const done = await waitForTask(id, (task) => statusOf(task) === "completed", 25_000, "completion");
     const row = await prisma.task.findUnique({ where: { id } });
@@ -351,7 +351,7 @@ describe.skipIf(!dbReady || !workerBuilt)("stack E2E (TASK-079…089)", () => {
     expect(progressOf(done)).toBe(row?.progress);
   }, 30_000);
 
-  it("completes end to end: POST → pg-boss → worker → processing → progress → completed (TASK-081)", async () => {
+  it("completes end to end: POST → pg-boss → worker → processing → progress → completed", async () => {
     const id = idOf((await postTask({ duration: 5 })).body);
     const seen: Array<{ status: string; progress: number }> = [];
     const start = Date.now();
@@ -376,7 +376,7 @@ describe.skipIf(!dbReady || !workerBuilt)("stack E2E (TASK-079…089)", () => {
     expect(final).toMatchObject({ status: "completed", progress: 100 });
   }, 40_000);
 
-  it("streams WebSocket progress messages while the task is processing (TASK-083)", async () => {
+  it("streams WebSocket progress messages while the task is processing", async () => {
     const id = idOf((await postTask({ duration: 6 })).body);
     const handle = await connectAndSubscribe(id);
     const terminal = await waitTerminalFrame(handle, 25_000);
@@ -395,7 +395,7 @@ describe.skipIf(!dbReady || !workerBuilt)("stack E2E (TASK-079…089)", () => {
     expect(values.every((value, index) => index === 0 || value >= (values[index - 1] ?? 0))).toBe(true);
   }, 40_000);
 
-  it("delivers the WebSocket completion message (TASK-084)", async () => {
+  it("delivers the WebSocket completion message", async () => {
     const id = idOf((await postTask({ duration: 4 })).body);
     const handle = await connectAndSubscribe(id);
     const terminal = await waitTerminalFrame(handle, 25_000);
@@ -404,7 +404,7 @@ describe.skipIf(!dbReady || !workerBuilt)("stack E2E (TASK-079…089)", () => {
     expect(terminal).toMatchObject({ type: "completed", taskId: id });
   }, 40_000);
 
-  it("reflects an injected failure on both REST and WebSocket (TASK-082)", async () => {
+  it("reflects an injected failure on both REST and WebSocket", async () => {
     const id = idOf((await postTask({ duration: 10, shouldFail: true })).body);
     const handle = await connectAndSubscribe(id);
     const terminal = await waitTerminalFrame(handle, 30_000);
@@ -422,7 +422,7 @@ describe.skipIf(!dbReady || !workerBuilt)("stack E2E (TASK-079…089)", () => {
     expect(row?.completedAt).toBeNull();
   }, 45_000);
 
-  it("sends updates to two subscribers of the same task (TASK-085)", async () => {
+  it("sends updates to two subscribers of the same task", async () => {
     const id = idOf((await postTask({ duration: 6 })).body);
     const first = await connectAndSubscribe(id);
     const second = await connectAndSubscribe(id);
@@ -439,7 +439,7 @@ describe.skipIf(!dbReady || !workerBuilt)("stack E2E (TASK-079…089)", () => {
     expect(second.frames.some((frame) => frame.type === "progress")).toBe(true);
   }, 45_000);
 
-  it("disconnects mid-task, reconnects and resynchronizes state (TASK-086)", async () => {
+  it("disconnects mid-task, reconnects and resynchronizes state", async () => {
     const id = idOf((await postTask({ duration: 8 })).body);
     const first = await connectAndSubscribe(id);
     expect(first.frames[0]?.type).toBe("state");
@@ -471,7 +471,7 @@ describe.skipIf(!dbReady || !workerBuilt)("stack E2E (TASK-079…089)", () => {
     second.socket.close();
   }, 60_000);
 
-  it("runs different-duration tasks concurrently with independent progress (TASK-087)", async () => {
+  it("runs different-duration tasks concurrently with independent progress", async () => {
     const a = idOf((await postTask({ duration: 10 })).body);
     const b = idOf((await postTask({ duration: 3 })).body);
     const c = idOf((await postTask({ duration: 5 })).body);
@@ -493,7 +493,7 @@ describe.skipIf(!dbReady || !workerBuilt)("stack E2E (TASK-079…089)", () => {
     expect(doneC).toBeLessThan(doneA); // 5s task did not wait for the 10s task
   }, 60_000);
 
-  it("SIGKILLs a worker mid-task and a fresh worker completes the task (TASK-088)", async () => {
+  it("SIGKILLs a worker mid-task and a fresh worker completes the task", async () => {
     const id = idOf((await postTask({ duration: 30 })).body);
     await waitForTask(
       id,

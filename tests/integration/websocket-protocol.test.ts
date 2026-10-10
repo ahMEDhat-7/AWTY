@@ -97,7 +97,7 @@ async function subscribe(
   return nextMessage(socket);
 }
 
-describe("websocket protocol (TASK-047/048/052)", () => {
+describe("websocket protocol", () => {
   it("answers subscribe with the current state sync message", async () => {
     const socket = await openClient();
 
@@ -140,7 +140,7 @@ describe("websocket protocol (TASK-047/048/052)", () => {
   });
 });
 
-describe("websocket broadcasts (TASK-049/050/051)", () => {
+describe("websocket broadcasts", () => {
   it("fans updates out to all subscribers of the task, and only those", async () => {
     const clientA = await openClient();
     const clientB = await openClient();

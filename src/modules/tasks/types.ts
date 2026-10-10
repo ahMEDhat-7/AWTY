@@ -19,7 +19,7 @@ export interface CreateTaskResponse {
   status: TaskStatus;
 }
 
-/** GET /tasks/:id transport shape (TASK-042) — current, DB-authoritative state. */
+/** GET /tasks/:id transport shape — current, DB-authoritative state. */
 export interface TaskStateResponse {
   id: string;
   status: TaskStatus;
