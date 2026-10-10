@@ -232,4 +232,24 @@ describe("toErrorMessage (TASK-036)", () => {
     expect(toErrorMessage(null)).toBe("unknown error");
     expect(toErrorMessage(undefined)).toBe("unknown error");
   });
+
+  it("normalizes every unknown throwable to a loggable, public-safe string (TASK-077)", () => {
+    // Anything can be thrown in JS. The result must always be a non-empty
+    // string that never leaks a spoofed shape: only real Error instances
+    // expose their message, everything else falls back to a constant.
+    const unknowns: unknown[] = [
+      42,
+      true,
+      Symbol("thrown"),
+      10n,
+      () => undefined,
+      ["nested"],
+      { message: "spoofed error message" },
+    ];
+    for (const value of unknowns) {
+      const message = toErrorMessage(value);
+      expect(message, String(typeof value)).toBe("unknown error");
+      expect(message.length).toBeGreaterThan(0);
+    }
+  });
 });

@@ -49,6 +49,19 @@ describe("websocket inbound validation (TASK-019)", () => {
     }
   });
 
+  it("rejects values of the wrong JSON type (TASK-076)", () => {
+    const wrongTypes = [
+      JSON.stringify({ type: 42, taskId: TASK_ID }),
+      JSON.stringify({ type: "subscribe", taskId: 42 }),
+      JSON.stringify({ type: "subscribe", taskId: true }),
+      JSON.stringify({ type: "subscribe", taskId: { id: TASK_ID } }),
+      JSON.stringify({ type: ["subscribe"], taskId: TASK_ID }),
+    ];
+    for (const frame of wrongTypes) {
+      expect(parseWsMessage(frame).ok, frame).toBe(false);
+    }
+  });
+
   it("strips unknown fields from otherwise valid messages", () => {
     const frame = JSON.stringify({
       type: "subscribe",

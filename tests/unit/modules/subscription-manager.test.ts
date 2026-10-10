@@ -62,6 +62,15 @@ describe("subscription manager (TASK-046)", () => {
     expect(manager.getSubscribers("task-a")).toEqual([peer]);
   });
 
+  it("returns no subscribers for a task nobody is watching (TASK-075)", () => {
+    const manager = createSubscriptionManager();
+    const { peer } = makePeer();
+    manager.subscribe("task-a", peer);
+
+    expect(manager.getSubscribers("never-seen")).toEqual([]);
+    expect(manager.getSubscribers("task-b")).toEqual([]);
+  });
+
   it("removes a connection from every task set at once (disconnect cleanup)", () => {
     const manager = createSubscriptionManager();
     const { peer: leaving } = makePeer();
