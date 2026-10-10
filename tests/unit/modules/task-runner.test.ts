@@ -30,6 +30,7 @@ function makePayload(overrides: Partial<TaskQueuePayloadDto> = {}): TaskQueuePay
 function makeHarness(overrides: {
   task?: Task | null;
   claim?: Task | null;
+  restart?: Task | null;
   sleep?: (ms: number) => Promise<void>;
 } = {}) {
   const slept: number[] = [];
@@ -42,6 +43,9 @@ function makeHarness(overrides: {
       .mockResolvedValue(
         overrides.claim === undefined ? makeTask({ status: "processing" }) : overrides.claim,
       ),
+    restartProcessing: vi
+      .fn()
+      .mockResolvedValue(overrides.restart ?? null),
     updateProgress: vi
       .fn()
       .mockResolvedValue(makeTask({ status: "processing" })),
@@ -69,6 +73,8 @@ describe("task runner (TASK-034/035/036/037/038/040)", () => {
 
     expect(h.deps.findById).toHaveBeenCalledWith(TASK_ID);
     expect(h.deps.markProcessing).toHaveBeenCalledWith(TASK_ID);
+    // A fresh claim means there is nothing to recover.
+    expect(h.deps.restartProcessing).not.toHaveBeenCalled();
     expect(h.slept).toEqual(Array(10).fill(1000));
     expect(h.deps.markCompleted).toHaveBeenCalledWith(TASK_ID);
     expect(h.deps.markFailed).not.toHaveBeenCalled();
@@ -98,14 +104,33 @@ describe("task runner (TASK-034/035/036/037/038/040)", () => {
     expect(calls).toEqual([...calls].sort((a, b) => a - b));
   });
 
-  it("does nothing when the guarded pending -> processing claim is lost", async () => {
+  it("does nothing when the task is already terminal (both guarded claims miss)", async () => {
     const h = makeHarness({ claim: null });
 
     await h.run(makePayload());
 
+    // The pending claim missed, so the recovery claim was attempted — and
+    // found a terminal task, which must never be resurrected.
+    expect(h.deps.restartProcessing).toHaveBeenCalledWith(TASK_ID);
     expect(h.slept).toEqual([]);
     expect(h.deps.updateProgress).not.toHaveBeenCalled();
     expect(h.deps.markCompleted).not.toHaveBeenCalled();
+    expect(h.deps.markFailed).not.toHaveBeenCalled();
+  });
+
+  it("recovers a crashed attempt by restarting the simulation from 0% (TASK-061/062)", async () => {
+    // A redelivered job whose task is still `processing`: the previous
+    // attempt's worker died, so this run takes over from the reset row.
+    const h = makeHarness({
+      claim: null,
+      restart: makeTask({ status: "processing", progress: 0 }),
+    });
+
+    await h.run(makePayload());
+
+    expect(h.deps.restartProcessing).toHaveBeenCalledWith(TASK_ID);
+    expect(h.persisted()).toEqual([10, 20, 30, 40, 50, 60, 70, 80, 90]);
+    expect(h.deps.markCompleted).toHaveBeenCalledWith(TASK_ID);
     expect(h.deps.markFailed).not.toHaveBeenCalled();
   });
 
@@ -141,6 +166,50 @@ describe("task runner (TASK-034/035/036/037/038/040)", () => {
 
     expect(h.deps.markFailed).toHaveBeenCalledWith(TASK_ID);
     expect(h.deps.markCompleted).not.toHaveBeenCalled();
+  });
+});
+
+describe("task failure isolation (TASK-063)", () => {
+  it("one failing task settles as failed while a concurrent one completes", async () => {
+    const TASK_ID_B = "11111111-2222-4333-8444-555555555555";
+    // Two jobs, one shared task table: every write is a guarded UPDATE
+    // keyed by the task id, so the failing run can only ever touch its own
+    // row (PRD §19).
+    const rows = new Map<string, Task>([
+      [TASK_ID, makeTask()],
+      [TASK_ID_B, makeTask({ id: TASK_ID_B })],
+    ]);
+    const guard = (
+      id: string,
+      from: Task["status"],
+      to: Task["status"],
+      data: Partial<Task>,
+    ): Promise<Task | null> => {
+      const row = rows.get(id);
+      if (row === undefined || row.status !== from) {
+        return Promise.resolve(null);
+      }
+      const updated: Task = { ...row, ...data, status: to, updatedAt: new Date() };
+      rows.set(id, updated);
+      return Promise.resolve(updated);
+    };
+    const run = createTaskRunner({
+      findById: (id) => Promise.resolve(rows.get(id) ?? null),
+      markProcessing: (id) => guard(id, "pending", "processing", { startedAt: new Date() }),
+      restartProcessing: (id) => guard(id, "processing", "processing", { progress: 0 }),
+      updateProgress: (id, progress) => guard(id, "processing", "processing", { progress }),
+      markCompleted: (id) => guard(id, "processing", "completed", { progress: 100, completedAt: new Date() }),
+      markFailed: (id) => guard(id, "processing", "failed", { failedAt: new Date() }),
+      sleep: () => Promise.resolve(),
+    });
+
+    await Promise.all([
+      run({ taskId: TASK_ID, shouldFail: true }),
+      run({ taskId: TASK_ID_B, shouldFail: false }),
+    ]);
+
+    expect(rows.get(TASK_ID)?.status).toBe("failed");
+    expect(rows.get(TASK_ID_B)?.status).toBe("completed");
   });
 });
 

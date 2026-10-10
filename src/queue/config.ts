@@ -20,6 +20,8 @@ export const TASK_QUEUE_NAME = "awty-tasks";
  * - `expireInSeconds`: hard cap on active time. Must exceed the maximum
  *   task duration (300s) so a healthy long task is never re-delivered
  *   mid-flight, while still bounding a wedged-but-alive worker to 6 min.
+ *   This is the queue-level fallback; the publisher overrides it per job
+ *   with `duration + margin` (TASK-061, see `taskJobExpireSeconds`).
  * - `retryLimit` + backoff: redelivery after a crash is bounded — three
  *   attempts, 5s base delay doubling (jittered) up to 60s.
  */
@@ -31,6 +33,24 @@ export const TASK_QUEUE_OPTIONS = {
   retryBackoff: true,
   retryDelayMax: 60,
 } as const satisfies Omit<Queue, "name">;
+
+/**
+ * TASK-061 — per-job expiry policy: `duration + margin`.
+ *
+ * Verified against the installed pg-boss 12.37.0: `SendOptions` extends
+ * `QueueOptions`, so `expireInSeconds` sent with a job overrides the
+ * queue-level fallback for that job. The margin covers queue wait and
+ * scheduling jitter — long enough that a healthy worker always finishes
+ * (no spurious redelivery into the restart path), short enough that a job
+ * owned by a dead worker is reclaimed instead of sitting out the 6-minute
+ * queue default.
+ */
+export const TASK_JOB_EXPIRE_MARGIN_SECONDS = 60;
+
+/** TASK-061 — the active-time bound for one job, in seconds. */
+export function taskJobExpireSeconds(durationSeconds: number): number {
+  return durationSeconds + TASK_JOB_EXPIRE_MARGIN_SECONDS;
+}
 
 /**
  * Per-worker consumption (PRD §13 worker design, §19 concurrency):

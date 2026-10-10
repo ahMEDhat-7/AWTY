@@ -67,10 +67,12 @@ describe("create-task service (TASK-023)", () => {
     }
     expect(result.task).toEqual({ id: TASK_ID, status: "pending" });
     expect(h.create).toHaveBeenCalledWith({ data: { duration: 10 } });
-    expect(h.publish).toHaveBeenCalledWith(h.tx, {
-      taskId: TASK_ID,
-      shouldFail: false,
-    });
+    expect(h.publish).toHaveBeenCalledWith(
+      h.tx,
+      { taskId: TASK_ID, shouldFail: false },
+      // TASK-061 — the job expiry is sized to this task's duration.
+      { durationSeconds: 10 },
+    );
     expect(h.stats.transactions).toBe(1);
   });
 
@@ -78,10 +80,11 @@ describe("create-task service (TASK-023)", () => {
     const h = makeHarness();
     const result = await h.service({ duration: 3, shouldFail: true });
     expect(result.ok).toBe(true);
-    expect(h.publish).toHaveBeenCalledWith(h.tx, {
-      taskId: TASK_ID,
-      shouldFail: true,
-    });
+    expect(h.publish).toHaveBeenCalledWith(
+      h.tx,
+      { taskId: TASK_ID, shouldFail: true },
+      { durationSeconds: 3 },
+    );
   });
 
   it("rejects invalid bodies before touching the database", async () => {
@@ -122,7 +125,7 @@ describe("create-task service (TASK-023)", () => {
     const result = await h.service({ duration: 10 });
     expect(result.ok).toBe(true);
     expect(order).toEqual(["insert", "publish"]);
-    expect(h.publish).toHaveBeenCalledWith(h.tx, expect.anything());
+    expect(h.publish).toHaveBeenCalledWith(h.tx, expect.anything(), expect.anything());
   });
 });
 

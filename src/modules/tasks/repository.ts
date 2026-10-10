@@ -32,6 +32,23 @@ export function createTaskRepository(db: Pick<PrismaClient, "task">) {
       return result.count > 0 ? db.task.findUnique({ where: { id } }) : null;
     },
 
+    /**
+     * TASK-061/062 (ADR-005) — crash recovery: a redelivered job whose task
+     * is still `processing` belongs to an attempt whose worker died
+     * mid-run (pg-boss only redelivers after the owning worker's heartbeat
+     * has died). Restart the simulation from 0% rather than stranding the
+     * task: the guard requires `status = processing`, so a terminal task
+     * is never resurrected and a concurrent duplicate finds the same
+     * single-shot UPDATE.
+     */
+    async restartProcessing(id: string): Promise<Task | null> {
+      const result = await db.task.updateMany({
+        where: { id, status: "processing" },
+        data: { progress: 0, startedAt: new Date() },
+      });
+      return result.count > 0 ? db.task.findUnique({ where: { id } }) : null;
+    },
+
     /** Progress is only persisted while processing. Null otherwise. */
     async updateProgress(id: string, progress: number): Promise<Task | null> {
       const result = await db.task.updateMany({

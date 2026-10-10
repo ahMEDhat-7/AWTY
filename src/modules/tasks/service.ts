@@ -13,7 +13,11 @@ export interface CreateTaskServiceDeps {
   runInTransaction<T>(
     fn: (tx: Prisma.TransactionClient) => Promise<T>,
   ): Promise<T>;
-  publish(tx: Prisma.TransactionClient, payload: TaskQueuePayloadDto): Promise<void>;
+  publish(
+    tx: Prisma.TransactionClient,
+    payload: TaskQueuePayloadDto,
+    options: { durationSeconds: number },
+  ): Promise<void>;
 }
 
 /**
@@ -34,10 +38,15 @@ export function createCreateTaskService(deps: CreateTaskServiceDeps) {
         const created = await createTaskRepository(tx).create({
           duration: parsed.data.duration,
         });
-        await deps.publish(tx, {
-          taskId: created.id,
-          shouldFail: parsed.data.shouldFail ?? false,
-        });
+        await deps.publish(
+          tx,
+          {
+            taskId: created.id,
+            shouldFail: parsed.data.shouldFail ?? false,
+          },
+          // TASK-061 — the job's expiry is sized to this task's duration.
+          { durationSeconds: parsed.data.duration },
+        );
         return created;
       });
       return { ok: true, task: { id: task.id, status: task.status } };

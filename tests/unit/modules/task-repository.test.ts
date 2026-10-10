@@ -125,10 +125,11 @@ describe("guarded updates (TASK-022)", () => {
   it("pins id and source status in every guarded update", async () => {
     const { repo, updateMany } = makeDb(1);
     await repo.markProcessing(TASK_ID);
+    await repo.restartProcessing(TASK_ID);
     await repo.updateProgress(TASK_ID, 10);
     await repo.markCompleted(TASK_ID);
     await repo.markFailed(TASK_ID);
-    expect(updateMany).toHaveBeenCalledTimes(4);
+    expect(updateMany).toHaveBeenCalledTimes(5);
     for (const call of updateMany.mock.calls) {
       const args = call[0] as { where: { id?: unknown; status?: unknown } };
       expect(args.where.id).toBe(TASK_ID);
@@ -139,8 +140,21 @@ describe("guarded updates (TASK-022)", () => {
   it("returns null for every guarded update that fails its guard", async () => {
     const { repo } = makeDb(0);
     expect(await repo.markProcessing(TASK_ID)).toBeNull();
+    expect(await repo.restartProcessing(TASK_ID)).toBeNull();
     expect(await repo.updateProgress(TASK_ID, 10)).toBeNull();
     expect(await repo.markCompleted(TASK_ID)).toBeNull();
     expect(await repo.markFailed(TASK_ID)).toBeNull();
+  });
+
+  it("restartProcessing resets a processing task to 0% with a fresh startedAt (TASK-061/062)", async () => {
+    const { repo, updateMany } = makeDb(1, taskRow({ status: "processing", progress: 40 }));
+
+    const result = await repo.restartProcessing(TASK_ID);
+
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: TASK_ID, status: "processing" },
+      data: { progress: 0, startedAt: dateMatcher },
+    });
+    expect(result?.status).toBe("processing");
   });
 });

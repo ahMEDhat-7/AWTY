@@ -3,6 +3,7 @@ import {
   TASK_QUEUE_NAME,
   TASK_QUEUE_OPTIONS,
   TASK_WORK_OPTIONS,
+  taskJobExpireSeconds,
 } from "../../../src/queue/config.ts";
 
 describe("pg-boss configuration (TASK-030)", () => {
@@ -21,6 +22,17 @@ describe("pg-boss configuration (TASK-030)", () => {
     // durationSchema caps task duration at 300s — a healthy long task must
     // never expire mid-run and be re-delivered to a second worker.
     expect(TASK_QUEUE_OPTIONS.expireInSeconds).toBeGreaterThan(300);
+  });
+
+  it("sizes each job's expiry to its own duration plus a margin (TASK-061)", () => {
+    // SendOptions extends QueueOptions in pg-boss 12.37.0, so this
+    // per-job value overrides the queue-level fallback: even the longest
+    // task's job stays within it, while a short task's job is reclaimed
+    // far sooner than the 6-minute queue default.
+    expect(taskJobExpireSeconds(1)).toBe(61);
+    expect(taskJobExpireSeconds(300)).toBe(
+      TASK_QUEUE_OPTIONS.expireInSeconds,
+    );
   });
 
   it("bounds redelivery with exponential backoff", () => {

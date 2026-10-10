@@ -18,6 +18,9 @@ const sleep = (ms: number): Promise<void> =>
 const runTask = createTaskRunner({
   findById: (id) => repository.findById(id),
   markProcessing: (id) => repository.markProcessing(id),
+  // TASK-061/062 — crash recovery: a redelivered job for a task stuck in
+  // `processing` restarts the simulation from 0% (ADR-005).
+  restartProcessing: (id) => repository.restartProcessing(id),
   updateProgress: (id, progress) => repository.updateProgress(id, progress),
   markCompleted: (id) => repository.markCompleted(id),
   markFailed: (id) => repository.markFailed(id),
