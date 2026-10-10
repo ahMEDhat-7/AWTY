@@ -68,8 +68,7 @@ git clone https://github.com/ahMEDhat-7/AWTY.git
 cd AWTY
 pnpm install
 cp .env.example .env
-docker compose up -d --build   # postgres + api + worker
-pnpm db:migrate                # apply database migrations
+docker compose up -d --build   # postgres + migrations + api + worker
 curl localhost:3000/health     # → {"status":"ok","db":"connected"}
 ```
 
@@ -111,7 +110,7 @@ docker compose down                   # stop (database volume persists)
 docker compose down -v                # stop and wipe the database
 ```
 
-Services: `postgres` (`postgres:18-alpine`, port 5432), `api` (port 3000) and `worker` — one image, two commands. `api` and `worker` start only after `postgres` is healthy.
+Services: `postgres` (`postgres:18-alpine`, port 5432), a one-shot `migrate` job (Prisma migrations, exits when done), `api` (port 3000) and `worker` — one image, the app services select their command. `api` and `worker` start only after `postgres` is healthy **and** migrations are applied, so `docker compose up` works even on an empty database volume.
 
 > Note: the containerized `api` and `pnpm dev` both bind port 3000 — run one or the other.
 

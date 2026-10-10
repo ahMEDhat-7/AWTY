@@ -21,6 +21,9 @@ ENV NODE_ENV=production
 COPY --from=build --chown=awty:awty /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
 COPY --from=build --chown=awty:awty /app/node_modules ./node_modules
 COPY --from=build --chown=awty:awty /app/dist ./dist
+# Prisma CLI config + migrations, for the one-shot `migrate deploy` service.
+COPY --from=build --chown=awty:awty /app/prisma ./prisma
+COPY --from=build --chown=awty:awty /app/prisma.config.ts ./prisma.config.ts
 USER awty
 EXPOSE 3000
 CMD ["node", "dist/app/server.js"]

@@ -18,10 +18,27 @@ services:
     ports:
       - "5432:5432"
 
+  # One-shot init job: applies Prisma migrations, then exits 0. api and
+  # worker wait for it (service_completed_successfully), which is what makes
+  # `docker compose up` sufficient even on an empty volume (TASK-092/093).
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: awty
+    command: ["node_modules/.bin/prisma", "migrate", "deploy"]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://awty:awty@postgres:5432/awty
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   api:
     build:
       context: .
       dockerfile: Dockerfile
+    image: awty
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://awty:awty@postgres:5432/awty
@@ -33,6 +50,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/health || exit 1"]
       interval: 5s
@@ -44,6 +63,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    image: awty
     command: ["node", "dist/worker-entry.js"]
     environment:
       NODE_ENV: production
@@ -54,6 +74,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   pgdata:
