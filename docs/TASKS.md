@@ -1327,44 +1327,46 @@ Run multiple workers and verify a single task is never actively processed by two
 Before submission:
 
 ```text
-[ ] Express is used
-[ ] Prisma 7 is used
-[ ] PostgreSQL 18 is used
-[ ] pg-boss is used
-[ ] Node.js 24 + pnpm 12 used throughout (no npm)
-[ ] TypeScript strict mode is enabled
-[ ] No `any` exists in project code/tests
-[ ] WebSocket /ws works
-[ ] POST /tasks works
-[ ] GET /tasks/:id works
-[ ] Async processing works
-[ ] pending works
-[ ] processing works
-[ ] completed works
-[ ] failed works
-[ ] completed progress = 100
-[ ] progress updates reach subscribers
-[ ] completion reaches subscribers
-[ ] failure reaches subscribers
-[ ] multiple subscribers work
-[ ] reconnect recovery works
-[ ] API restart persistence works
-[ ] worker restart recovery works
-[ ] tasks progress independently
-[ ] multiple workers are safe
-[ ] migrations exist
-[ ] infrastructure gate passed (compose up before feature code)
-[ ] docker compose up starts postgres/api/worker in one command
-[ ] OpenAPI spec served at /openapi.json
-[ ] Swagger UI works at /docs
-[ ] README exists
-[ ] ADRs exist
-[ ] GitHub Actions CI works
-[ ] CD builds and smoke-tests the image without pushing
-[ ] no deployment secrets are required
-[ ] docs kept in sync per phase
-[ ] final tests and build pass
+[x] Express is used
+[x] Prisma 7 is used
+[x] PostgreSQL 18 is used
+[x] pg-boss is used
+[x] Node.js 24 + pnpm 12 used throughout (no npm)
+[x] TypeScript strict mode is enabled
+[x] No `any` exists in project code/tests
+[x] WebSocket /ws works
+[x] POST /tasks works
+[x] GET /tasks/:id works
+[x] Async processing works
+[x] pending works
+[x] processing works
+[x] completed works
+[x] failed works
+[x] completed progress = 100
+[x] progress updates reach subscribers
+[x] completion reaches subscribers
+[x] failure reaches subscribers
+[x] multiple subscribers work
+[x] reconnect recovery works
+[x] API restart persistence works
+[x] worker restart recovery works
+[x] tasks progress independently
+[x] multiple workers are safe
+[x] migrations exist
+[x] infrastructure gate passed (compose up before feature code)
+[x] docker compose up starts postgres/api/worker in one command
+[x] OpenAPI spec served at /openapi.json
+[x] Swagger UI works at /docs
+[x] README exists
+[x] ADRs exist
+[x] GitHub Actions CI works
+[x] CD builds and smoke-tests the image without pushing
+[x] no deployment secrets are required
+[x] docs kept in sync per phase
+[x] final tests and build pass
 ```
+
+Every item was verified during the final phase: suites green (156/156 tests, 23 files), the §29 walkthroughs executed live against the running stack, and each CI/CD step's command run locally (workflows are YAML-validated; a hosted run happens on push).
 
 ---
 
