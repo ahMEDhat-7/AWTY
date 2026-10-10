@@ -2,7 +2,7 @@
 
 AWTY is a real-time asynchronous task-processing backend. A client submits a long-running task, immediately receives a task ID, and follows progress live over a WebSocket connection while PostgreSQL remains the durable source of truth.
 
-**Status:** implementation in progress — this README documents the target contract; current phase status lives in [docs/TASKS.md](docs/TASKS.md).
+**Status:** implementation complete — this README documents the delivered system; task-by-task history and the final quality gate live in [docs/TASKS.md](docs/TASKS.md).
 
 ## Problem
 
@@ -50,7 +50,7 @@ Detailed diagram: [docs/DESIN.excalidraw](docs/DESIN.excalidraw) · full specifi
 | Validation      | zod 4                                          |
 | API docs        | OpenAPI 3.1 + Swagger UI at `/docs`            |
 | Tests           | Vitest (unit + integration)                    |
-| Local infra     | Docker Compose (`postgres` + `api` + `worker`) |
+| Local infra     | Docker Compose (`postgres` + `migrate` + `api` + `worker`) |
 | CI/CD           | GitHub Actions                                 |
 
 ## Setup
@@ -212,7 +212,7 @@ Subscribing to an unknown task answers `{ "type": "error", "error": "not_found" 
 
 ## CI/CD
 
-- **CI** (`.github/workflows/ci.yml`, on pull requests and pushes to `main`): pnpm 12 + Node.js 24 install → Prisma generate/migration validation → typecheck → lint → unit + integration tests → OpenAPI specification check → build. Type errors, lint errors, test failures, or specification failures fail the pipeline.
+- **CI** (`.github/workflows/ci.yml`, on pull requests and pushes to `main`): pnpm 12 (cached store) + Node.js 24 → `pnpm install --frozen-lockfile` → Prisma generate + schema validation → typecheck → lint (the zero-`any` policy) → build → migrations applied from a clean state against a `postgres:18-alpine` service → unit tests → integration tests (including the stack E2E suite, which spawns `dist/worker-entry.js`) → OpenAPI specification check. Type errors, lint errors, test failures, migration/schema failures, specification failures, or build failures fail the pipeline. Build runs before the tests so the E2E suite cannot silently self-skip.
 - **CD** (`.github/workflows/cd.yml`, after CI succeeds on `main`): **built** — the single production Docker image (one image, two commands). **Not deployed** — nothing is pushed to any registry and there is intentionally no hosted deployment target (PRD §5); the image itself is the deployable artifact. **Verified by** a deployment-equivalent smoke run inside the runner: fresh PostgreSQL → migrations from a clean state → `api` + `worker` containers → `POST /tasks` → poll `GET /tasks/:id` until `completed` / `progress = 100`. **Configuration required** — only `DATABASE_URL`; no repository secrets beyond the default `GITHUB_TOKEN` (TASK-104: nothing to store in GitHub Secrets).
 
 ## Documentation

@@ -750,13 +750,14 @@ checkout
 → validate Prisma/migrations
 → typecheck
 → lint
+→ build
+→ apply migrations from a clean state (PostgreSQL service)
 → unit tests
 → integration tests with PostgreSQL
 → OpenAPI specification check
-→ build
 ```
 
-The pipeline must fail on type errors, lint errors, test failures, migration/schema failures, OpenAPI specification failures, or build failures.
+Build runs before the tests rather than last: the stack E2E suite spawns `dist/worker-entry.js` and self-skips when `dist/` is missing, so building first guarantees CI actually runs it. The pipeline must fail on type errors, lint errors, test failures, migration/schema failures, OpenAPI specification failures, or build failures.
 
 ### CD
 

@@ -1053,11 +1053,14 @@ checkout
 → Prisma/schema/migration validation
 → typecheck
 → lint
+→ build
+→ apply migrations from a clean state
 → unit tests
 → integration tests
 → OpenAPI specification check
-→ build
 ```
+
+Build precedes the tests so the stack E2E suite (spawns `dist/worker-entry.js`) runs instead of self-skipping.
 
 ## TASK-098 — Provide PostgreSQL in CI
 
