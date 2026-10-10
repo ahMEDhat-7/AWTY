@@ -1,0 +1,90 @@
+# Quality gate (§25/TASK-097): every push to main and every pull request runs
+# generate → validate → typecheck → lint → build → migrate → tests → OpenAPI.
+#
+# Design notes:
+# - pnpm comes from `packageManager` in package.json (pnpm 12), Node from
+#   `.nvmrc`-style pin below (Node 24) — TASK-101: the pnpm store cache is the
+#   only cache, kept because it speeds installs without extra config.
+# - `pnpm build` runs before the tests so `dist/` exists: the stack E2E suite
+#   (tests/integration/stack-e2e.test.ts) spawns dist/worker-entry.js and
+#   would otherwise self-skip in CI.
+# - PostgreSQL 18 runs as a job service (TASK-098); migrations are applied
+#   from a clean state with `prisma migrate deploy` (TASK-099).
+# - `pnpm lint` enforces the zero-`any` policy (`no-explicit-any: error`) and
+#   `pnpm typecheck` rejects type errors — TASK-100.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: awty
+          POSTGRES_PASSWORD: awty
+          POSTGRES_DB: awty
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U awty -d awty"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://awty:awty@localhost:5432/awty
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        # version comes from `packageManager` in package.json (pnpm 12)
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma generate
+        run: pnpm db:generate
+
+      - name: Validate Prisma schema
+        run: pnpm exec prisma validate
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Lint (zero-any policy)
+        run: pnpm lint
+
+      - name: Build
+        run: pnpm build
+
+      - name: Apply migrations from a clean state
+        run: |
+          pnpm exec prisma migrate deploy
+          pnpm exec prisma migrate status
+
+      - name: Unit tests
+        run: pnpm test:unit
+
+      - name: Integration tests (incl. stack E2E)
+        run: pnpm test:integration
+
+      - name: OpenAPI specification check
+        run: pnpm openapi:check
