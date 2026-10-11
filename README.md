@@ -2,7 +2,7 @@
 
 AWTY is a real-time asynchronous task-processing backend. A client submits a long-running task, immediately receives a task ID, and follows progress live over a WebSocket connection while PostgreSQL remains the durable source of truth.
 
-**Status:** implementation complete — this README documents the delivered system; task-by-task history and the final quality gate live in [docs/TASKS.md](docs/TASKS.md).
+**Status:** implementation complete — this README documents the delivered system.
 
 ## Problem
 
@@ -33,7 +33,7 @@ Client ── REST ──▶ Express API ──▶ PostgreSQL + Prisma (source o
 - **Separate worker process** — consumes jobs, simulates duration, persists progress, completes or fails tasks
 - **Database trigger → LISTEN/NOTIFY** — state-change signals to the WebSocket layer; notifications are hints, never the source of truth
 
-Detailed diagram: [docs/DESIN.excalidraw](docs/DESIN.excalidraw) · full specification: [docs/PRD.md](docs/PRD.md) §7
+Detailed diagram: [docs/DESIN.excalidraw](docs/DESIN.excalidraw) · requirements: [docs/PRD.md](docs/PRD.md)
 
 ## Technology Stack
 
@@ -53,7 +53,7 @@ Detailed diagram: [docs/DESIN.excalidraw](docs/DESIN.excalidraw) · full specifi
 | Local infra     | Docker Compose (`postgres` + `migrate` + `api` + `worker`) |
 | CI/CD           | GitHub Actions                                 |
 
-## Setup
+## Getting Started
 
 ### Prerequisites
 
@@ -78,16 +78,15 @@ curl localhost:3000/health     # → {"status":"ok","db":"connected"}
 docker compose up -d postgres
 pnpm db:migrate
 pnpm dev            # API on http://localhost:3000 (native TypeScript watch)
-pnpm start:worker   # worker process, in a second terminal
+pnpm dev:worker     # worker process, in a second terminal (also watch mode)
 ```
-
-## How to Run
 
 ### Scripts
 
 | Command                                    | Purpose                                                      |
 | ------------------------------------------ | ------------------------------------------------------------ |
 | `pnpm dev`                                 | Run the API in watch mode (native TypeScript, no build step) |
+| `pnpm dev:worker`                          | Run the worker in watch mode (native TypeScript)             |
 | `pnpm build`                               | Generate the Prisma client and compile to `dist/`            |
 | `pnpm start`                               | Run the compiled API (`dist/app/server.js`)                  |
 | `pnpm start:worker`                        | Run the worker (`dist/worker-entry.js`)                      |
@@ -113,6 +112,34 @@ docker compose down -v                # stop and wipe the database
 Services: `postgres` (`postgres:18-alpine`, port 5432), a one-shot `migrate` job (Prisma migrations, exits when done), `api` (port 3000) and `worker` — one image, the app services select their command. `api` and `worker` start only after `postgres` is healthy **and** migrations are applied, so `docker compose up` works even on an empty database volume.
 
 > Note: the containerized `api` and `pnpm dev` both bind port 3000 — run one or the other.
+
+## Quick Demo
+
+Create a task, then watch it live — the browser console on [`/docs`](http://localhost:3000/docs) (F12) is the quickest WebSocket client:
+
+```bash
+curl -X POST http://localhost:3000/tasks \
+  -H 'Content-Type: application/json' \
+  -d '{"duration": 10}'
+# → { "id": "<TASK_ID>", "status": "pending" }
+```
+
+```js
+const ws = new WebSocket("ws://localhost:3000/ws");
+ws.onmessage = (event) =>
+  console.log(new Date().toISOString().slice(11, 19), JSON.parse(event.data));
+ws.onopen = () =>
+  ws.send(JSON.stringify({ type: "subscribe", taskId: "<TASK_ID>" }));
+```
+
+```text
+12:00:01  { "type": "state",    "status": "pending", "progress": 0 }
+12:00:02  { "type": "progress", "progress": 1 }
+    …     … roughly 1 % per second …
+12:00:11  { "type": "completed" }
+```
+
+Add `"shouldFail": true` to the create body to watch the failure path end in `{ "type": "failed" }` (also reflected in `GET /tasks/:id`).
 
 ## REST API
 
@@ -205,18 +232,33 @@ Subscribing to an unknown task answers `{ "type": "error", "error": "not_found" 
 
 ## Recovery & Concurrency
 
-- **Worker concurrency** — each worker process runs **4 task slots in parallel** (`localConcurrency: 4`) and consumes **one job per handler call** (`batchSize: 1`) so a failure can only ever settle that one task. Multiple worker processes run side by side (`docker compose up --scale worker=2`); pg-boss job ownership plus guarded database transitions guarantee a task is actively held by exactly one worker at a time.
+- **Independent progress** — each worker process runs **4 task slots in parallel** (`localConcurrency: 4`) and consumes **one job per handler call** (`batchSize: 1`), so a failure can only ever settle that one task and creating a task never blocks another.
+- **One active worker per task** — pg-boss job ownership plus guarded database transitions hold exactly one worker per task, however many run side by side (`docker compose up -d --scale worker=2`).
 - **API restart** — task state lives in PostgreSQL; clients recover through `GET /tasks/:id` or by resubscribing.
-- **Worker crash** — pg-boss re-delivers the job and guarded state transitions prevent double-processing. The recovered simulation **restarts from 0%** (documented decision, ADR-005); a task can never be stranded in `processing`.
+- **Worker crash** — pg-boss re-delivers the job and guarded state transitions prevent double-processing. The recovered simulation **restarts from 0%** (a documented decision); a task can never be stranded in `processing`.
 - **Retry exhaustion** — a job that runs out of pg-boss retries is copied to the queue's dead-letter queue (`awty-tasks-dead`); the worker consumes it and fails the still-open task through the same guarded transitions, so a task can never be stranded in `pending` either.
 - **Client disconnect** — processing continues unaffected; reconnect + subscribe resynchronizes.
 - **Multiple subscribers** — every subscriber of a task receives the same progress/completion/failure messages.
-- **Multiple workers** — pg-boss job ownership plus guarded transitions guarantee one active worker per task: `docker compose up -d --scale worker=2`.
 
 ## CI/CD
 
-- **CI** (`.github/workflows/ci.yml`, on pull requests and pushes to `main`): pnpm 12 (cached store) + Node.js 24 → `pnpm install --frozen-lockfile` → Prisma generate + schema validation → typecheck → lint (the zero-`any` policy) → build → migrations applied from a clean state against a `postgres:18-alpine` service → unit tests → integration tests (including the stack E2E suite, which spawns `dist/worker-entry.js`) → OpenAPI specification check. Type errors, lint errors, test failures, migration/schema failures, specification failures, or build failures fail the pipeline. Build runs before the tests so the E2E suite cannot silently self-skip.
-- **CD** (`.github/workflows/cd.yml`, after CI succeeds on `main`): **built** — the single production Docker image (one image, two commands). **Not deployed** — nothing is pushed to any registry and there is intentionally no hosted deployment target; the image itself is the deployable artifact. **Verified by** a deployment-equivalent smoke run inside the runner: fresh PostgreSQL → migrations from a clean state → `api` + `worker` containers → `POST /tasks` → poll `GET /tasks/:id` until `completed` / `progress = 100`. **Configuration required** — only `DATABASE_URL`; no repository secrets beyond the default `GITHUB_TOKEN`, so there is nothing to store in GitHub Secrets.
+**CI** — [.github/workflows/ci.yml](.github/workflows/ci.yml), on pull requests and pushes to `main`:
+
+1. pnpm 12 (cached store) + Node.js 24, then `pnpm install --frozen-lockfile`
+2. Prisma generate + schema validation
+3. Typecheck, lint (the zero-`any` policy), build
+4. Migrations applied from a clean state against a `postgres:18-alpine` service
+5. Unit tests, then integration tests — including the stack E2E suite, which spawns `dist/worker-entry.js`
+6. OpenAPI specification check
+
+Any type, lint, test, migration, specification, or build failure fails the pipeline. Build runs before the tests so the E2E suite cannot silently self-skip.
+
+**CD** — [.github/workflows/cd.yml](.github/workflows/cd.yml), after CI succeeds on `main`:
+
+- **Built:** the single production Docker image (one image, two commands — API and worker).
+- **Verified:** a deployment-equivalent smoke run inside the runner — fresh PostgreSQL, migrations from a clean state, `api` + `worker` containers, `POST /tasks`, then polling `GET /tasks/:id` until `completed` / `progress = 100`.
+- **Not deployed:** nothing is pushed to any registry and there is intentionally no hosted deployment target; the image itself is the deployable artifact.
+- **Configuration:** only `DATABASE_URL` — no repository secrets beyond the default `GITHUB_TOKEN`.
 
 ## Documentation
 
