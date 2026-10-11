@@ -206,6 +206,7 @@ Subscribing to an unknown task answers `{ "type": "error", "error": "not_found" 
 - **Worker concurrency** — each worker process runs **4 task slots in parallel** (`localConcurrency: 4`) and consumes **one job per handler call** (`batchSize: 1`) so a failure can only ever settle that one task. Multiple worker processes run side by side (`docker compose up --scale worker=2`); pg-boss job ownership plus guarded database transitions guarantee a task is actively held by exactly one worker at a time.
 - **API restart** — task state lives in PostgreSQL; clients recover through `GET /tasks/:id` or by resubscribing.
 - **Worker crash** — pg-boss re-delivers the job and guarded state transitions prevent double-processing. The recovered simulation **restarts from 0%** (documented decision, ADR-005); a task can never be stranded in `processing`.
+- **Retry exhaustion** — a job that runs out of pg-boss retries is copied to the queue's dead-letter queue (`awty-tasks-dead`); the worker consumes it and fails the still-open task through the same guarded transitions, so a task can never be stranded in `pending` either.
 - **Client disconnect** — processing continues unaffected; reconnect + subscribe resynchronizes.
 - **Multiple subscribers** — every subscriber of a task receives the same progress/completion/failure messages.
 - **Multiple workers** — pg-boss job ownership plus guarded transitions guarantee one active worker per task: `docker compose up -d --scale worker=2`.
@@ -222,4 +223,4 @@ Subscribing to an unknown task answers `{ "type": "error", "error": "not_found" 
 | [docs/PRD.md](docs/PRD.md)                     | Product & system requirements, decisions, architecture |
 | [docs/TASKS.md](docs/TASKS.md)                 | Detailed implementation tasks and execution order      |
 | [docs/DESIN.excalidraw](docs/DESIN.excalidraw) | End-to-end architecture diagram                        |
-| [docs/adr/](docs/adr/)                         | Architecture decision records (ADR-001–007)             |
+| [docs/adr/](docs/adr/)                         | Architecture decision records (ADR-001–007) + failure-modes index |

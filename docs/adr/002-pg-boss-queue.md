@@ -12,6 +12,7 @@ Use **pg-boss** as the job queue, in the same PostgreSQL database as the task da
 
 - `POST /tasks` enqueues the job **transactionally** with the row insert (`{ db: fromPrisma(tx) }`), so a task row and its job exist together or not at all.
 - Per-job `expireInSeconds = duration + 60` (`taskJobExpireSeconds`) overrides the queue-level default, so a slow-but-alive simulation never expires out from under itself.
+- The task queue declares a **dead-letter queue** (`awty-tasks-dead`): pg-boss 12.37.0 has no failed-job event, so terminally-failed jobs land there and the worker's reconciler settles their tasks (ADR-005).
 - The worker consumes with `localConcurrency: 4`, `batchSize: 1`.
 
 ## Consequences

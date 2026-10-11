@@ -23,17 +23,20 @@ The machine lives in one place, `src/modules/tasks/transitions.ts`, and every st
 
 ```text
 pending    → processing
+pending    → failed        (dead-letter reconciliation only)
 processing → completed
 processing → failed
 ```
 
 **Invalid transitions** — everything else, notably:
 
-- `pending → completed` / `pending → failed` (must pass through `processing`)
+- `pending → completed` (must pass through `processing`)
 - `completed → *` and `failed → *` (terminal states are immutable)
 - any transition out of a terminal state, including re-claim attempts after recovery
 
 **Terminal states:** `completed`, `failed` — no further writes are possible; `ALLOWED_TRANSITIONS` maps both to `[]`.
+
+`pending → failed` exists solely for dead-letter reconciliation (ADR-005): a job whose retries are exhausted never runs again, so a task still `pending` is failed directly rather than stranded. Worker paths still claim `pending → processing` first; nothing reaches a terminal state without either a run or a dead job behind it.
 
 Recovery's restart-from-0% (ADR-005) is *not* a status transition: the row stays `processing` while `progress`/`startedAt` are reset by the guarded `restartProcessing` claim.
 
