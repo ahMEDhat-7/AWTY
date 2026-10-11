@@ -2,7 +2,8 @@ import { openApiDocument } from "../src/modules/openapi/spec.ts";
 
 /**
  * OpenAPI CI check: the document must be 3.1, must document POST /tasks,
- * and must cover every outcome the API implements.
+ * must cover every outcome the API implements, and must document the
+ * WebSocket protocol (frames and schemas) alongside the HTTP operations.
  */
 
 /**
@@ -35,4 +36,17 @@ assert(get?.responses?.["200"] !== undefined, "200 response must be documented f
 assert(get?.responses?.["400"] !== undefined, "400 response must be documented for GET /tasks/{id}");
 assert(get?.responses?.["404"] !== undefined, "404 response must be documented for GET /tasks/{id}");
 
-console.log("openapi:check passed — OpenAPI 3.1 document covers POST /tasks and GET /tasks/{id}");
+const ws = paths["/ws"]?.get;
+const schemas = openApiDocument.components?.schemas ?? {};
+
+assert(ws !== undefined, "GET /ws must document the WebSocket protocol");
+assert(ws?.responses?.["101"] !== undefined, "101 response must be documented for GET /ws");
+assert(
+  typeof ws?.description === "string" && ws.description.includes("subscribe"),
+  "GET /ws description must document the subscribe frame",
+);
+assert(schemas["SubscribeMessage"] !== undefined, "SubscribeMessage schema must be registered");
+assert(schemas["TaskUpdate"] !== undefined, "TaskUpdate schema must be registered");
+assert(schemas["ProtocolError"] !== undefined, "ProtocolError schema must be registered");
+
+console.log("openapi:check passed — OpenAPI 3.1 document covers POST /tasks, GET /tasks/{id}, and the /ws protocol");

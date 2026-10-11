@@ -165,6 +165,8 @@ curl http://localhost:3000/tasks/0b7f8f3e-1c2d-4a5b-9e8f-112233445566
 
 Connect to `ws://localhost:3000/ws`.
 
+> The same protocol (frames, schemas, reconnect semantics) is documented interactively at [`/docs`](http://localhost:3000/docs) under **Subscribe to task updates** — OpenAPI cannot *execute* WebSocket operations from "Try it out", but every frame shape is browsable there.
+
 ### Subscribe
 
 ```json
