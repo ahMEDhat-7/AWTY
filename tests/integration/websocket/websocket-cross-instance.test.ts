@@ -11,6 +11,13 @@
  * instance's own listener — never through in-memory state shared
  * between processes.
  *
+ * Notifications are hints that trigger an authoritative re-read, so
+ * back-to-back writes would legitimately coalesce intermediate values
+ * (a skipped progress frame is not a protocol violation). The writes
+ * below are therefore paced on delivery — which is also how the real
+ * worker behaves, ticking about once a second — keeping the per-update
+ * assertions exact while still proving cross-instance fan-out.
+ *
  * Prerequisites (self-skips when missing):
  * - PostgreSQL reachable through DATABASE_URL (.env)
  * - a built server: `pnpm build` (the suite spawns dist/app/server.js)
@@ -212,34 +219,78 @@ describe.skipIf(!dbReady || !serverBuilt)("websocket cross-instance fan-out", ()
         expect(state).toMatchObject({ taskId, status: "pending", progress: 0 });
       }
 
-      // Persist the same guarded writes a worker performs. The database
-      // trigger notifies both instances; neither process was told anything
-      // directly.
-      expect(await repository.markProcessing(taskId)).not.toBeNull();
-      expect(await repository.updateProgress(taskId, 40)).not.toBeNull();
-      expect(await repository.updateProgress(taskId, 80)).not.toBeNull();
-      expect(await repository.markCompleted(taskId)).not.toBeNull();
+      // Persist the same guarded writes a worker performs — each write
+      // paced on its fan-out reaching both instances, which is also how
+      // the worker behaves (it ticks about once a second). The database
+      // trigger notifies both instances; neither process was told
+      // anything directly.
+      const expectUpdateOnBoth = async (
+        label: string,
+        matches: (frame: Frame) => boolean,
+      ): Promise<void> => {
+        for (const [name, handle] of [
+          ["A", handleA],
+          ["B", handleB],
+        ] as const) {
+          await waitFor(
+            () => handle.frames.some(matches),
+            15_000,
+            `${label} frame on instance ${name}`,
+          );
+        }
+      };
 
-      // Each instance's listener must independently pick up the change
-      // and fan it out to its own subscriber.
+      expect(await repository.markProcessing(taskId)).not.toBeNull();
+      await expectUpdateOnBoth(
+        "processing",
+        (frame) => frame.type === "progress" && frame.progress === 0,
+      );
+      expect(await repository.updateProgress(taskId, 40)).not.toBeNull();
+      await expectUpdateOnBoth(
+        "40%",
+        (frame) => frame.type === "progress" && frame.progress === 40,
+      );
+      expect(await repository.updateProgress(taskId, 80)).not.toBeNull();
+      await expectUpdateOnBoth(
+        "80%",
+        (frame) => frame.type === "progress" && frame.progress === 80,
+      );
+      expect(await repository.markCompleted(taskId)).not.toBeNull();
+      await expectUpdateOnBoth(
+        "completed",
+        (frame) => frame.type === "completed",
+      );
+
+      // Every instance ended on the persisted terminal state, progress
+      // stayed monotonic throughout, and nothing arrived after the
+      // terminal frame.
       for (const [name, handle] of [
         ["A", handleA],
         ["B", handleB],
       ] as const) {
-        await waitFor(
-          () =>
-            handle.frames.some(
-              (frame) => frame.type === "progress" && frame.progress === 80,
-            ) && handle.frames.some((frame) => frame.type === "completed"),
-          15_000,
-          `progress and completed frames on instance ${name}`,
-        );
-        const progress = handle.frames.find(
-          (frame) => frame.type === "progress" && frame.progress === 40,
-        );
-        expect(progress, `instance ${name} saw the 40% frame`).toBeDefined();
         const terminal = handle.frames.find((frame) => frame.type === "completed");
-        expect(terminal).toMatchObject({ taskId });
+        expect(terminal, `instance ${name} saw the completed frame`).toMatchObject({
+          taskId,
+        });
+
+        const progressValues = handle.frames.flatMap((frame) =>
+          frame.type === "progress" && frame.progress !== undefined
+            ? [frame.progress]
+            : [],
+        );
+        for (let i = 1; i < progressValues.length; i += 1) {
+          expect(
+            progressValues[i],
+            `instance ${name} progress stayed monotonic`,
+          ).toBeGreaterThanOrEqual(progressValues[i - 1] ?? 0);
+        }
+        const terminalIndex = handle.frames.findIndex(
+          (frame) => frame.type === "completed",
+        );
+        expect(
+          handle.frames.slice(terminalIndex + 1),
+          `instance ${name} received nothing after the terminal frame`,
+        ).toEqual([]);
       }
     } finally {
       handleA.socket.close();
