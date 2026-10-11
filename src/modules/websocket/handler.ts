@@ -1,17 +1,9 @@
-import type { TaskStateResponse } from "../tasks/types.ts";
 import { parseWsMessage } from "./dto.ts";
-import type { WsOutboundMessage } from "./protocol.ts";
-import type { SubscriptionManager, WsPeer } from "./subscriptions.ts";
-
-/** DB-authoritative snapshot reader — wired to the task repository. */
-export type FindTaskSnapshot = (
-  taskId: string,
-) => Promise<TaskStateResponse | null>;
-
-export interface MessageHandlerDeps {
-  subscriptions: Pick<SubscriptionManager, "subscribe" | "unsubscribe">;
-  findTask: FindTaskSnapshot;
-}
+import type {
+  MessageHandlerDeps,
+  WsOutboundMessage,
+  WsPeer,
+} from "./types.ts";
 
 /**
  * Builds the WebSocket protocol handler.
@@ -70,8 +62,6 @@ export function createMessageHandler(deps: MessageHandlerDeps) {
     }
   };
 }
-
-export type MessageHandler = ReturnType<typeof createMessageHandler>;
 
 function send(socket: WsPeer, message: WsOutboundMessage): void {
   socket.send(JSON.stringify(message));

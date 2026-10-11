@@ -1,9 +1,6 @@
 import { Router } from "express";
-import { sendInternalError, sendNotFound, sendValidationError } from "../../shared/errors.ts";
-import type { CreateTaskResult, GetTaskResult } from "./service.ts";
-
-export type CreateTaskHandler = (body: unknown) => Promise<CreateTaskResult>;
-export type GetTaskHandler = (id: string) => Promise<GetTaskResult>;
+import { sendInternalError, sendNotFound, sendValidationError } from "../../lib/errors.ts";
+import type { CreateTaskHandler, GetTaskHandler } from "./types.ts";
 
 /**
  * Builds the task routers. They validate nothing themselves: raw input

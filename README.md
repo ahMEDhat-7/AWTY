@@ -223,4 +223,4 @@ Subscribing to an unknown task answers `{ "type": "error", "error": "not_found" 
 | [docs/PRD.md](docs/PRD.md)                     | Product & system requirements, decisions, architecture |
 | [docs/TASKS.md](docs/TASKS.md)                 | Detailed implementation tasks and execution order      |
 | [docs/DESIN.excalidraw](docs/DESIN.excalidraw) | End-to-end architecture diagram                        |
-| [docs/adr/](docs/adr/)                         | Architecture decision records (ADR-001–007) + failure-modes index |
+| [docs/adr/](docs/adr/)                         | Architecture decision records (ADR-001–007)             |

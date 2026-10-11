@@ -1,24 +1,12 @@
-import type { Prisma, Task } from "../../generated/prisma/client.ts";
-import { uuidSchema, validationFailure, type ValidationIssue } from "../../lib/validation.ts";
-import { parseCreateTaskBody, type TaskQueuePayloadDto } from "./dto.ts";
+import { uuidSchema, validationFailure } from "../../lib/validation.ts";
+import { parseCreateTaskBody } from "./dto.ts";
 import { createTaskRepository } from "./repository.ts";
-import type { CreateTaskResponse, TaskStateResponse } from "./types.ts";
-
-export type CreateTaskResult =
-  | { ok: true; task: CreateTaskResponse }
-  | { ok: false; kind: "validation"; issues: ValidationIssue[] }
-  | { ok: false; kind: "unexpected"; cause: unknown };
-
-export interface CreateTaskServiceDeps {
-  runInTransaction<T>(
-    fn: (tx: Prisma.TransactionClient) => Promise<T>,
-  ): Promise<T>;
-  publish(
-    tx: Prisma.TransactionClient,
-    payload: TaskQueuePayloadDto,
-    options: { durationSeconds: number },
-  ): Promise<void>;
-}
+import type {
+  CreateTaskResult,
+  CreateTaskServiceDeps,
+  GetTaskResult,
+  GetTaskServiceDeps,
+} from "./types.ts";
 
 /**
  * Builds the create-task application service.
@@ -58,16 +46,6 @@ export function createCreateTaskService(deps: CreateTaskServiceDeps) {
       return { ok: false, kind: "unexpected", cause };
     }
   };
-}
-
-export type GetTaskResult =
-  | { ok: true; task: TaskStateResponse }
-  | { ok: false; kind: "validation"; issues: ValidationIssue[] }
-  | { ok: false; kind: "not_found" }
-  | { ok: false; kind: "unexpected"; cause: unknown };
-
-export interface GetTaskServiceDeps {
-  findById(id: string): Promise<Task | null>;
 }
 
 /**

@@ -19,4 +19,4 @@ Use **pg-boss** as the job queue, in the same PostgreSQL database as the task da
 
 - No custom queue code: ownership, retries, expiry, and dead-worker recovery come from pg-boss (verified against the installed 12.37.0 API, not assumed).
 - One database to deploy, back up, and reason about — the queue survives restarts with the data.
-- Queue semantics are shared by every process (API enqueues, workers consume) through the same connection configuration in `src/queue/config.ts`.
+- Queue semantics are shared by every process (API enqueues, workers consume) through the same connection configuration in `src/modules/queue/config.ts`.

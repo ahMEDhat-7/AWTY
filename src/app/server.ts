@@ -4,10 +4,10 @@ import { createApp } from "./app.ts";
 import { env } from "../config/env.ts";
 import { prisma } from "../lib/prisma.ts";
 import { attachWebSocketGateway } from "../modules/websocket/gateway.ts";
-import type { FindTaskSnapshot } from "../modules/websocket/handler.ts";
 import { startTaskUpdateListener } from "../modules/websocket/listener.ts";
+import type { FindTaskSnapshot } from "../modules/websocket/types.ts";
 import { createTaskRepository } from "../modules/tasks/repository.ts";
-import { ensureQueue } from "../queue/pg-boss.ts";
+import { ensureQueue } from "../modules/queue/pg-boss.ts";
 
 const app = createApp();
 

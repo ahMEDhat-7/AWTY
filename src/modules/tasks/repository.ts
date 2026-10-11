@@ -134,5 +134,3 @@ export function createTaskRepository(db: Pick<PrismaClient, "task">) {
     },
   };
 }
-
-export type TaskRepository = ReturnType<typeof createTaskRepository>;

@@ -8,8 +8,8 @@ import {
   createGetTaskService,
 } from "../modules/tasks/service.ts";
 import { mountOpenApi } from "../modules/openapi/swagger.ts";
-import { publishTaskJob } from "../queue/publisher.ts";
-import { httpErrorHandler, notFoundHandler } from "../shared/errors.ts";
+import { publishTaskJob } from "../modules/queue/publisher.ts";
+import { httpErrorHandler, notFoundHandler } from "../lib/errors.ts";
 
 export function createApp(): Express {
   const app = express();

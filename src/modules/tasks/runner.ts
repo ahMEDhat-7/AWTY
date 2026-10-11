@@ -1,6 +1,5 @@
-import type { TaskQueuePayloadDto } from "./dto.ts";
 import { calculateProgress, PROGRESS_TICK_MS } from "./progress.ts";
-import type { TaskRepository } from "./repository.ts";
+import type { TaskQueuePayloadDto, TaskRunnerDeps } from "./types.ts";
 
 /**
  * Normalizes a caught error to a loggable message.
@@ -19,20 +18,6 @@ export function toErrorMessage(cause: unknown): string {
     return cause;
   }
   return "unknown error";
-}
-
-export interface TaskRunnerDeps
-  extends Pick<
-    TaskRepository,
-    | "findById"
-    | "markProcessing"
-    | "restartProcessing"
-    | "updateProgress"
-    | "markCompleted"
-    | "markFailed"
-  > {
-  /** Injectable timer — unit tests run instantly, the worker injects real timers. */
-  sleep(ms: number): Promise<void>;
 }
 
 /**
@@ -130,5 +115,3 @@ export function createTaskRunner(deps: TaskRunnerDeps) {
     }
   };
 }
-
-export type TaskRunner = ReturnType<typeof createTaskRunner>;

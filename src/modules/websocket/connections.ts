@@ -1,4 +1,4 @@
-import type { SubscriptionManager, WsPeer } from "./subscriptions.ts";
+import type { SubscriptionManager, WsPeer } from "./types.ts";
 
 /**
  * Builds the in-memory connection manager.
@@ -29,5 +29,3 @@ export function createConnectionManager(subscriptions: SubscriptionManager) {
     },
   };
 }
-
-export type ConnectionManager = ReturnType<typeof createConnectionManager>;

@@ -15,7 +15,7 @@ Split the gateway into two responsibilities, both wired as factories in the comp
 
 Broadcasts are driven by the database trigger → `pg_notify` → `LISTEN` channel (`task_updates`): every `Task` row update emits a hint, and the gateway fans it out to subscribers. Terminal frames (`completed`, `failed`) are their own message types.
 
-Because propagation goes through the database rather than between processes, **multiple API instances** each run their own listener and fan out to their own local subscribers — no broker is needed, PostgreSQL already sits between every instance. This property is covered by an integration suite (`tests/integration/websocket-cross-instance.test.ts`) that spawns two API processes against one database and asserts a single persisted update reaches subscribers on both.
+Because propagation goes through the database rather than between processes, **multiple API instances** each run their own listener and fan out to their own local subscribers — no broker is needed, PostgreSQL already sits between every instance. This property is covered by an integration suite (`tests/integration/websocket/websocket-cross-instance.test.ts`) that spawns two API processes against one database and asserts a single persisted update reaches subscribers on both.
 
 ## Consequences
 

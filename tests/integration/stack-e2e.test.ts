@@ -30,15 +30,15 @@ import { WebSocket, type RawData } from "ws";
 import { createApp } from "../../src/app/app.ts";
 import { env } from "../../src/config/env.ts";
 import { prisma } from "../../src/lib/prisma.ts";
-import {
-  attachWebSocketGateway,
-  type WebSocketGateway,
-} from "../../src/modules/websocket/gateway.ts";
-import type { FindTaskSnapshot } from "../../src/modules/websocket/handler.ts";
+import { attachWebSocketGateway } from "../../src/modules/websocket/gateway.ts";
 import { startTaskUpdateListener } from "../../src/modules/websocket/listener.ts";
+import type {
+  FindTaskSnapshot,
+  WebSocketGateway,
+} from "../../src/modules/websocket/types.ts";
 import { createTaskRepository } from "../../src/modules/tasks/repository.ts";
-import { TASK_DLQ_NAME, TASK_QUEUE_NAME } from "../../src/queue/config.ts";
-import { boss, ensureQueue } from "../../src/queue/pg-boss.ts";
+import { TASK_DLQ_NAME, TASK_QUEUE_NAME } from "../../src/modules/queue/config.ts";
+import { boss, ensureQueue } from "../../src/modules/queue/pg-boss.ts";
 
 /** True when PostgreSQL answers a plain connection within 4s. */
 async function probeDatabase(): Promise<boolean> {

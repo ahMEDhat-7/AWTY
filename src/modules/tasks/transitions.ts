@@ -1,4 +1,4 @@
-import type { TaskStatus } from "./types.ts";
+import type { StateTransitionInput, StateTransitionResult, TaskStatus } from "./types.ts";
 
 /**
  * The enforced state machine. `pending → failed` exists solely for
@@ -14,15 +14,6 @@ const ALLOWED_TRANSITIONS: Readonly<Record<TaskStatus, readonly TaskStatus[]>> =
   completed: [],
   failed: [],
 };
-
-export interface StateTransitionInput {
-  from: TaskStatus;
-  to: TaskStatus;
-}
-
-export type StateTransitionResult =
-  | { ok: true; from: TaskStatus; to: TaskStatus }
-  | { ok: false; from: TaskStatus; to: TaskStatus; reason: string };
 
 export function canTransition(from: TaskStatus, to: TaskStatus): boolean {
   return ALLOWED_TRANSITIONS[from].includes(to);

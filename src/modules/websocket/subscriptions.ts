@@ -1,11 +1,4 @@
-/**
- * The connection port shared by both managers: the minimal surface they
- * rely on, so the managers stay testable with plain fakes and are never
- * coupled to the `ws` package.
- */
-export interface WsPeer {
-  send(data: string): void;
-}
+import type { WsPeer } from "./types.ts";
 
 /**
  * Builds the in-memory subscription manager:
@@ -83,5 +76,3 @@ export function createSubscriptionManager() {
     },
   };
 }
-
-export type SubscriptionManager = ReturnType<typeof createSubscriptionManager>;

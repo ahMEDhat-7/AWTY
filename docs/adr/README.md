@@ -2,8 +2,6 @@
 
 Significant technical choices made during AWTY's implementation, one per task in `docs/TASKS.md` §28.
 
-New to the system? [Failure Modes and How AWTY Handles Them](AWTY-TOP-5-PROBLEMS-AND-ADRS.md) indexes the five failure windows this design closes and links each to its ADR and source files.
-
 | ADR                                                     | Decision                              |
 | ------------------------------------------------------- | ------------------------------------- |
 | [001](001-postgresql-source-of-truth.md)                | PostgreSQL as the source of truth     |

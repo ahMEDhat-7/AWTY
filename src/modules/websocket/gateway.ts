@@ -1,13 +1,9 @@
 import type { Server as HttpServer } from "node:http";
 import { WebSocketServer, type WebSocket } from "ws";
 import { createConnectionManager } from "./connections.ts";
-import { createMessageHandler, type FindTaskSnapshot } from "./handler.ts";
-import type { WsTaskUpdate } from "./protocol.ts";
+import { createMessageHandler } from "./handler.ts";
 import { createSubscriptionManager } from "./subscriptions.ts";
-
-export interface WebSocketGatewayDeps {
-  findTask: FindTaskSnapshot;
-}
+import type { WsTaskUpdate, WebSocketGatewayDeps } from "./types.ts";
 
 /**
  * Attaches a `ws` server to the existing Express HTTP server at `/ws`.
@@ -70,5 +66,3 @@ export function attachWebSocketGateway(
 
   return { wss, connections, subscriptions, broadcast };
 }
-
-export type WebSocketGateway = ReturnType<typeof attachWebSocketGateway>;

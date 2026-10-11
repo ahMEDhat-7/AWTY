@@ -4,6 +4,7 @@ import {
   validationFailure,
   type ParseResult,
 } from "../../lib/validation.ts";
+import type { CreateTaskBodyDto, TaskQueuePayloadDto } from "./types.ts";
 
 /**
  * Duration assumption: the source requirement defines duration only as
@@ -37,9 +38,6 @@ export const createTaskBodySchema = z
     description: "Task to enqueue. Processing starts asynchronously.",
   });
 
-/** DTO: validated POST /tasks body. The schema is the single source of truth. */
-export type CreateTaskBodyDto = z.infer<typeof createTaskBodySchema>;
-
 /**
  * Validates an unknown request body into a typed DTO.
  *
@@ -65,9 +63,6 @@ export const taskQueuePayloadSchema = z.object({
   taskId: uuidSchema,
   shouldFail: z.boolean().optional(),
 });
-
-/** DTO: validated queue job payload derived from its schema. */
-export type TaskQueuePayloadDto = z.infer<typeof taskQueuePayloadSchema>;
 
 /**
  * Validates an unknown queue job body into a typed DTO.

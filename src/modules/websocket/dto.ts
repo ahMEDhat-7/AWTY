@@ -5,6 +5,7 @@ import {
   type ParseResult,
   type ValidationIssue,
 } from "../../lib/validation.ts";
+import type { WsInboundMessage } from "./types.ts";
 
 export const subscribeMessageSchema = z.object({
   type: z.literal("subscribe"),
@@ -15,9 +16,6 @@ export const subscribeMessageSchema = z.object({
 export const inboundMessageSchema = z.discriminatedUnion("type", [
   subscribeMessageSchema,
 ]);
-
-export type SubscribeMessage = z.infer<typeof subscribeMessageSchema>;
-export type WsInboundMessage = z.infer<typeof inboundMessageSchema>;
 
 type DecodeResult =
   | { ok: true; data: unknown }

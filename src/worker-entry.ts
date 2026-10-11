@@ -2,9 +2,9 @@ import "dotenv/config"; // must run before any module reads process.env
 import { prisma } from "./lib/prisma.ts";
 import { createTaskRepository } from "./modules/tasks/repository.ts";
 import { createTaskRunner } from "./modules/tasks/runner.ts";
-import { boss } from "./queue/pg-boss.ts";
-import { startDeadJobReconciler } from "./queue/reconciler.ts";
-import { startTaskConsumer } from "./queue/worker.ts";
+import { boss } from "./modules/queue/pg-boss.ts";
+import { startDeadJobReconciler } from "./modules/queue/reconciler.ts";
+import { startTaskConsumer } from "./modules/queue/worker.ts";
 
 /**
  * The worker entrypoint: an independent process in the same package and

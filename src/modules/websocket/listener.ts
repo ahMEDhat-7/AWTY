@@ -1,40 +1,12 @@
 import type { TaskStateResponse } from "../tasks/types.ts";
-import type { FindTaskSnapshot } from "./handler.ts";
-import type { WsTaskUpdate } from "./protocol.ts";
+import type {
+  NotificationClient,
+  TaskUpdateListenerDeps,
+  WsTaskUpdate,
+} from "./types.ts";
 
 /** Channel published by the database trigger: payload `{"id","status","progress"}`. */
 export const TASK_UPDATES_CHANNEL = "task_updates";
-
-/** Notification shape as delivered by the `pg` client. */
-export interface NotificationMessage {
-  channel?: string;
-  payload?: string;
-}
-
-/**
- * Minimal `pg` client port — keeps the listener decoupled from the package
- * and testable with a fake; `pg.Client` satisfies it structurally.
- */
-export interface NotificationClient {
-  connect(): Promise<unknown>;
-  query(text: string): Promise<unknown>;
-  end(): Promise<void>;
-  on(
-    event: "notification",
-    listener: (message: NotificationMessage) => void,
-  ): void;
-  on(event: "error", listener: (error: Error) => void): void;
-  on(event: "end", listener: () => void): void;
-}
-
-export interface TaskUpdateListenerDeps {
-  /** Dedicated LISTEN connection factory — one connection per listener. */
-  createClient: () => NotificationClient;
-  findTask: FindTaskSnapshot;
-  broadcast: (message: WsTaskUpdate) => void;
-  /** Test seam; production default is a calm retry cadence. */
-  reconnectDelayMs?: number;
-}
 
 const DEFAULT_RECONNECT_MS = 3000;
 
@@ -158,8 +130,6 @@ export function startTaskUpdateListener(deps: TaskUpdateListenerDeps) {
     },
   };
 }
-
-export type TaskUpdateListener = ReturnType<typeof startTaskUpdateListener>;
 
 function extractTaskId(payload: string | undefined): string | undefined {
   if (payload === undefined) {
