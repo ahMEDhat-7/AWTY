@@ -8,6 +8,17 @@ import type { Queue, WorkOptions } from "pg-boss";
 export const TASK_QUEUE_NAME = "awty-tasks";
 
 /**
+ * Dead-letter queue for the task queue. Against the installed pg-boss
+ * 12.37.0 there is no failed-job event (the event set is
+ * `error`/`warning`/`wip`/`stopped`/`bam`/`flow`), but there is a native
+ * dead-letter feature: a job that exhausts its retries has its payload
+ * copied to the queue named here, consumable like any other queue. The
+ * worker's reconciler consumes it and fails tasks whose jobs are gone,
+ * so retry exhaustion can never strand a row in `pending`/`processing`.
+ */
+export const TASK_DLQ_NAME = "awty-tasks-dead";
+
+/**
  * Queue-level policy, inherited by every job at send time:
  *
  * - `heartbeatSeconds` (pg-boss requires >= 10): the worker heartbeats
@@ -31,6 +42,9 @@ export const TASK_QUEUE_OPTIONS = {
   retryDelay: 5,
   retryBackoff: true,
   retryDelayMax: 60,
+  // pg-boss copies a terminally-failed job's payload here (see
+  // TASK_DLQ_NAME); the reconciler turns it into a terminal task state.
+  deadLetter: TASK_DLQ_NAME,
 } as const satisfies Omit<Queue, "name">;
 
 /**
@@ -70,4 +84,30 @@ export function taskJobExpireSeconds(durationSeconds: number): number {
 export const TASK_WORK_OPTIONS = {
   batchSize: 1,
   localConcurrency: 4,
+} as const satisfies WorkOptions;
+
+/**
+ * Queue policy for the dead-letter queue itself, applied by
+ * `ensureQueue()`. Retry is bounded like the main queue so a failing
+ * reconciler redelivers its job a few times before the dead-letter copy
+ * itself stays failed (visible in pg-boss for manual redrive) — it can
+ * never loop forever. No heartbeat or long expiry: the handler only runs
+ * one guarded UPDATE.
+ */
+export const TASK_DLQ_QUEUE_OPTIONS = {
+  retryLimit: 3,
+  retryDelay: 5,
+  retryBackoff: true,
+  retryDelayMax: 60,
+  expireInSeconds: 60,
+} as const satisfies Omit<Queue, "name">;
+
+/**
+ * Per-worker consumption policy for the dead-letter queue: one
+ * reconciliation job at a time, one per handler call, so a thrown error
+ * redelivers exactly that job and can never fail a batch.
+ */
+export const TASK_DLQ_WORK_OPTIONS = {
+  batchSize: 1,
+  localConcurrency: 1,
 } as const satisfies WorkOptions;

@@ -1,7 +1,15 @@
 import type { TaskStatus } from "./types.ts";
 
+/**
+ * The enforced state machine. `pending → failed` exists solely for
+ * reconciliation: a job whose retries are exhausted is copied to the
+ * dead-letter queue and never runs again, so a task still `pending` is
+ * failed directly rather than stranded forever. Worker paths still claim
+ * `pending → processing` first; nothing may reach a terminal state
+ * without either a run or a dead job behind it.
+ */
 const ALLOWED_TRANSITIONS: Readonly<Record<TaskStatus, readonly TaskStatus[]>> = {
-  pending: ["processing"],
+  pending: ["processing", "failed"],
   processing: ["completed", "failed"],
   completed: [],
   failed: [],

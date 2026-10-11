@@ -8,6 +8,7 @@ import { TASK_STATUSES, type TaskStatus } from "../../../src/modules/tasks/types
 
 const VALID: ReadonlyArray<readonly [TaskStatus, TaskStatus]> = [
   ["pending", "processing"],
+  ["pending", "failed"], // reconciliation: dead-lettered job, never claimed
   ["processing", "completed"],
   ["processing", "failed"],
 ];
@@ -41,9 +42,8 @@ describe("state transitions", () => {
     }
   });
 
-  it("rejects skipping the processing phase", () => {
+  it("rejects skipping the processing phase to a successful state", () => {
     expect(canTransition("pending", "completed")).toBe(false);
-    expect(canTransition("pending", "failed")).toBe(false);
   });
 
   it("treats completed and failed as terminal", () => {

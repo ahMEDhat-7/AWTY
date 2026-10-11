@@ -65,7 +65,9 @@ export interface TaskRunnerDeps
  *   One task's failure settles its own job and cannot take down the
  *   worker process or any other task.
  *   Errors before the claim (load/claim) propagate so pg-boss can retry:
- *   no state has been moved yet.
+ *   no state has been moved yet. Should those retries run out, the job
+ *   is copied to the dead-letter queue and the worker's reconciler fails
+ *   the still-open task instead of stranding it.
  *
  * @param deps - repository methods and the injectable timer the run uses
  * @returns an async runner that executes one validated queue payload to a

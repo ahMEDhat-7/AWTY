@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  TASK_DLQ_NAME,
+  TASK_DLQ_QUEUE_OPTIONS,
+  TASK_DLQ_WORK_OPTIONS,
   TASK_QUEUE_NAME,
   TASK_QUEUE_OPTIONS,
   TASK_WORK_OPTIONS,
@@ -9,6 +12,19 @@ import {
 describe("pg-boss configuration", () => {
   it("names the task queue", () => {
     expect(TASK_QUEUE_NAME).toBe("awty-tasks");
+  });
+
+  it("routes terminally-failed jobs to a dead-letter queue", () => {
+    // pg-boss 12.37.0 has no failed-job event; the dead-letter feature is
+    // the native retry-exhaustion hook the reconciler consumes.
+    expect(TASK_QUEUE_OPTIONS.deadLetter).toBe(TASK_DLQ_NAME);
+    expect(TASK_DLQ_NAME).not.toBe(TASK_QUEUE_NAME);
+  });
+
+  it("bounds dead-letter retries so reconciliation cannot loop forever", () => {
+    expect(TASK_DLQ_QUEUE_OPTIONS.retryLimit).toBeGreaterThanOrEqual(0);
+    expect(TASK_DLQ_QUEUE_OPTIONS.expireInSeconds).toBeGreaterThan(0);
+    expect(TASK_DLQ_WORK_OPTIONS.batchSize).toBe(1);
   });
 
   it("enables heartbeat recovery within pg-boss's >=10s constraint", () => {

@@ -113,6 +113,25 @@ export function createTaskRepository(db: Pick<PrismaClient, "task">) {
       });
       return result.count > 0 ? db.task.findUnique({ where: { id } }) : null;
     },
+
+    /**
+     * Reconciliation guard for dead-lettered jobs: a job whose retries are
+     * exhausted is copied to the dead-letter queue and never runs again,
+     * so the task it named must not stay open forever. The UPDATE matches
+     * rows still `pending` (never claimed) or `processing` (crashed-out);
+     * a terminal task is untouched, and the preserved-progress rule of
+     * `markFailed` applies here too.
+     *
+     * @param id - the task's UUID named by the dead-lettered job
+     * @returns the updated task, or `null` when it is terminal or missing
+     */
+    async markFailedIfOpen(id: string): Promise<Task | null> {
+      const result = await db.task.updateMany({
+        where: { id, status: { in: ["pending", "processing"] } },
+        data: { status: "failed", failedAt: new Date() },
+      });
+      return result.count > 0 ? db.task.findUnique({ where: { id } }) : null;
+    },
   };
 }
 

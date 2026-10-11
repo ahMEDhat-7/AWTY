@@ -37,7 +37,7 @@ import {
 import type { FindTaskSnapshot } from "../../src/modules/websocket/handler.ts";
 import { startTaskUpdateListener } from "../../src/modules/websocket/listener.ts";
 import { createTaskRepository } from "../../src/modules/tasks/repository.ts";
-import { TASK_QUEUE_NAME } from "../../src/queue/config.ts";
+import { TASK_DLQ_NAME, TASK_QUEUE_NAME } from "../../src/queue/config.ts";
 import { boss, ensureQueue } from "../../src/queue/pg-boss.ts";
 
 /** True when PostgreSQL answers a plain connection within 4s. */
@@ -526,4 +526,44 @@ describe.skipIf(!dbReady || !workerBuilt)("stack E2E", () => {
     const jobs = await jobRows(id);
     expect(jobs[0]?.retry_count ?? 0).toBeGreaterThanOrEqual(1);
   }, 240_000);
+
+  it("fails a stranded task when its job dead-letters instead of retrying forever", async () => {
+    // A row with no live job: the shape retry exhaustion leaves behind
+    // (the job died pre-claim and pg-boss copied its payload to the
+    // dead-letter queue). The worker's reconciler must fail the task
+    // rather than strand it in `pending`.
+    const { id } = await prisma.task.create({ data: { duration: 10 } });
+    expect(statusOf((await fetchTask(id)).body)).toBe("pending");
+
+    await boss.send(TASK_DLQ_NAME, { taskId: id, shouldFail: false });
+
+    const settled = await waitForTask(
+      id,
+      (task) => statusOf(task) === "failed",
+      30_000,
+      "reconciled failure",
+    );
+    expect(progressOf(settled)).toBe(0); // never progressed; no fake progress
+    const row = await prisma.task.findUnique({ where: { id } });
+    expect(row?.status).toBe("failed");
+    expect(row?.failedAt).not.toBeNull();
+    expect(readFileSync(WORKER_LOG, "utf8")).toContain("reconciler:");
+  }, 45_000);
+
+  it("leaves a terminal task untouched when its dead letter arrives late", async () => {
+    // A run settled the task before its dead letter landed: the guarded
+    // reconciliation must not resurrect or overwrite the terminal state.
+    const { id } = await prisma.task.create({ data: { duration: 10 } });
+    const repository = createTaskRepository(prisma);
+    await repository.markProcessing(id);
+    await repository.markCompleted(id);
+
+    await boss.send(TASK_DLQ_NAME, { taskId: id, shouldFail: false });
+    await sleep(3000); // give the reconciler time to consume and no-op
+
+    const row = await prisma.task.findUnique({ where: { id } });
+    expect(row?.status).toBe("completed");
+    expect(row?.progress).toBe(100);
+    expect(row?.failedAt).toBeNull();
+  }, 30_000);
 });

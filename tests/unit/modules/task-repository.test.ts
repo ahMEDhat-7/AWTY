@@ -122,6 +122,21 @@ describe("guarded updates", () => {
     });
   });
 
+  it("markFailedIfOpen only moves a task still pending or processing", async () => {
+    const { repo, updateMany } = makeDb(1);
+    await repo.markFailedIfOpen(TASK_ID);
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: TASK_ID, status: { in: ["pending", "processing"] } },
+      data: { status: "failed", failedAt: dateMatcher },
+    });
+  });
+
+  it("returns null from markFailedIfOpen when the task is already terminal", async () => {
+    const { repo, findUnique } = makeDb(0);
+    expect(await repo.markFailedIfOpen(TASK_ID)).toBeNull();
+    expect(findUnique).not.toHaveBeenCalled();
+  });
+
   it("pins id and source status in every guarded update", async () => {
     const { repo, updateMany } = makeDb(1);
     await repo.markProcessing(TASK_ID);

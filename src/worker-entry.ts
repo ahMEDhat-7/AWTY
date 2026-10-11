@@ -3,12 +3,13 @@ import { prisma } from "./lib/prisma.ts";
 import { createTaskRepository } from "./modules/tasks/repository.ts";
 import { createTaskRunner } from "./modules/tasks/runner.ts";
 import { boss } from "./queue/pg-boss.ts";
+import { startDeadJobReconciler } from "./queue/reconciler.ts";
 import { startTaskConsumer } from "./queue/worker.ts";
 
 /**
  * The worker entrypoint: an independent process in the same package and
- * image as the API (`node dist/worker-entry.js`). It consumes queue jobs;
- * the API never does.
+ * image as the API (`node dist/worker-entry.js`). It consumes queue jobs
+ * and reconciles dead-lettered ones; the API never does.
  */
 const repository = createTaskRepository(prisma);
 
@@ -28,6 +29,10 @@ const runTask = createTaskRunner({
 });
 
 await startTaskConsumer(runTask);
+// Retry exhaustion safety net: a task whose job died in the queue is
+// failed through the guarded reconciliation path instead of being
+// stranded in `pending`/`processing` forever.
+await startDeadJobReconciler((id) => repository.markFailedIfOpen(id));
 console.log("AWTY worker consuming awty-tasks");
 
 async function shutdown(signal: string): Promise<void> {
