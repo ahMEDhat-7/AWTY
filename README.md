@@ -280,6 +280,6 @@ Any type, lint, test, migration, specification, or build failure fails the pipel
 | ---------------------------------------------- | ------------------------------------------------------ |
 | [docs/PRD.md](docs/PRD.md)                     | Product & system requirements, decisions, architecture |
 | [docs/TASKS.md](docs/TASKS.md)                 | Detailed implementation tasks and execution order      |
-| [docs/DESIN.excalidraw](docs/DESIN.excalidraw) | End-to-end architecture diagram                        |
+| [docs/DESIN.excalidraw](docs/DESIN.excalidraw) ([live view](https://excalidraw.com/#json=D_uXlKt12RGo5QuyD_y2V,31w_45w4hwRgfQaVUBKdDQ)) | End-to-end architecture diagram |
 | [docs/adr/](docs/adr/)                         | Architecture decision records (ADR-001–007)             |
 | [postman/](postman/)                           | Postman collection + environment (REST and WebSocket)   |
