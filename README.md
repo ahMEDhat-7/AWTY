@@ -141,6 +141,20 @@ ws.onopen = () =>
 
 Add `"shouldFail": true` to the create body to watch the failure path end in `{ "type": "failed" }` (also reflected in `GET /tasks/:id`).
 
+## Test with Postman
+
+A ready-made collection exercises the whole API — including the WebSocket protocol, which Swagger UI cannot execute:
+
+- [postman/AWTY.postman_collection.json](postman/AWTY.postman_collection.json) — import it (and the optional [postman/AWTY.postman_environment.json](postman/AWTY.postman_environment.json)) into Postman
+- `{{baseUrl}}` defaults to `http://localhost:3000`; **Create task** saves the returned id as `{{taskId}}` automatically, so every later request and the WebSocket frame just work
+
+| Folder | What it covers |
+| ------ | -------------- |
+| Health & Docs | `GET /health` smoke check; asserts the OpenAPI document covers REST + `/ws` |
+| Tasks | Create a task, create a failing variant (`shouldFail: true`), read state, and **poll until terminal** — one click re-sends `GET /tasks/:id` every second until `completed`/`failed`, logging the whole trail |
+| Error contract | A 400 validation error and a 404 unknown task, each asserting the documented error envelope |
+| WebSocket | Connect to `ws://localhost:3000/ws`, paste the ready-made subscribe frame (`{{taskId}}` resolves in the message box), and follow the documented sequence, error frames, and reconnect drill |
+
 ## REST API
 
 Interactive documentation: **http://localhost:3000/docs** (raw specification: `/openapi.json`).
@@ -268,3 +282,4 @@ Any type, lint, test, migration, specification, or build failure fails the pipel
 | [docs/TASKS.md](docs/TASKS.md)                 | Detailed implementation tasks and execution order      |
 | [docs/DESIN.excalidraw](docs/DESIN.excalidraw) | End-to-end architecture diagram                        |
 | [docs/adr/](docs/adr/)                         | Architecture decision records (ADR-001–007)             |
+| [postman/](postman/)                           | Postman collection + environment (REST and WebSocket)   |

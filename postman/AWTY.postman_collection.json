@@ -1,0 +1,395 @@
+{
+  "info": {
+    "_postman_id": "6f0d3a21-9c47-4e58-b1d3-0f2a7c5e8b90",
+    "name": "AWTY — Are We There Yet?",
+    "description": "Real-time asynchronous task-processing API — REST + WebSocket.\n\n**Prerequisites**\n\n1. The stack must be running: `docker compose up -d --build` (or `pnpm dev` + `pnpm dev:worker` with a containerized database).\n2. Import `AWTY.postman_environment.json` and select the **AWTY (local)** environment. `baseUrl` defaults to `http://localhost:3000`; change it there if your host differs.\n\n**How the pieces fit together**\n\n- Every request targets `{{baseUrl}}`.\n- **Create task** saves the returned id as the `{{taskId}}` collection variable (and in the environment when one is selected). Requests and the WebSocket frame that follow use it automatically — no copy-pasting.\n- **Poll until terminal** re-sends `GET /tasks/{{taskId}}` once a second until the task finishes; a single click of Send is enough.\n- The **WebSocket** item cannot be executed by Postman's HTTP runner — open it, press Connect, and paste the ready-made frames from its description. `{{taskId}}` resolves inside the message box.\n\nSuggested order on first run: Health → Create task → Poll until terminal → WebSocket → the Error contract folder.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health & Docs",
+      "item": [
+        {
+          "name": "GET /health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.expect(pm.response.code).to.equal(200));",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.test('API is up and the database is connected', () => {",
+                  "  pm.expect(body.status).to.equal('ok');",
+                  "  pm.expect(body.db).to.equal('connected');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "Smoke check: API liveness and database connectivity. Run it first — if this fails, nothing else in the collection will work."
+          }
+        },
+        {
+          "name": "GET /openapi.json",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.expect(pm.response.code).to.equal(200));",
+                  "",
+                  "const spec = pm.response.json();",
+                  "pm.test('OpenAPI 3.1 document', () => pm.expect(String(spec.openapi)).to.match(/^3\\.1\\./));",
+                  "pm.test('Documents REST and the WebSocket protocol', () => {",
+                  "  pm.expect(Object.keys(spec.paths)).to.include.members(['/tasks', '/tasks/{id}', '/ws']);",
+                  "  pm.expect(spec.components.schemas).to.include.keys('SubscribeMessage', 'TaskUpdate', 'ProtocolError');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/openapi.json",
+              "host": ["{{baseUrl}}"],
+              "path": ["openapi.json"]
+            },
+            "description": "The generated OpenAPI 3.1 specification. The tests assert it covers all three paths — including `/ws`, whose frame schemas (`SubscribeMessage`, `TaskUpdate`, `ProtocolError`) are registered as components. Browsable interactively at {{baseUrl}}/docs."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tasks",
+      "item": [
+        {
+          "name": "POST /tasks — create task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', () => pm.expect(pm.response.code).to.equal(201));",
+                  "",
+                  "const task = pm.response.json();",
+                  "pm.test('Returns the fresh task id and pending status', () => {",
+                  "  pm.expect(task.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+                  "  pm.expect(task.status).to.equal('pending');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('taskId', task.id);",
+                  "try { pm.environment.set('taskId', task.id); } catch (e) { /* environment not selected — collection variable is enough */ }",
+                  "console.log(`Created task ${task.id} — saved as {{taskId}}`);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"duration\": 30\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["tasks"]
+            },
+            "description": "Queues a 30-second task and returns immediately — processing is asynchronous. `duration` is seconds, 1–300.\n\nThe test script saves the returned id as `{{taskId}}` (collection variable), so **Poll until terminal** and the WebSocket frame can use it without copy-pasting.\n\nResponse: `201 { \"id\": \"…\", \"status\": \"pending\" }` — the id and status are all the client learns synchronously; follow the task via the poll request, `GET /tasks/{id}`, or the WebSocket."
+          }
+        },
+        {
+          "name": "POST /tasks — create failing task",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', () => pm.expect(pm.response.code).to.equal(201));",
+                  "",
+                  "const task = pm.response.json();",
+                  "pm.test('Returns the fresh task id and pending status', () => {",
+                  "  pm.expect(task.id).to.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);",
+                  "  pm.expect(task.status).to.equal('pending');",
+                  "});",
+                  "",
+                  "pm.collectionVariables.set('failingTaskId', task.id);",
+                  "try { pm.environment.set('failingTaskId', task.id); } catch (e) { /* environment not selected */ }",
+                  "console.log(`Created failing task ${task.id} — saved as {{failingTaskId}}`);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"duration\": 5,\n  \"shouldFail\": true\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["tasks"]
+            },
+            "description": "Same contract as creation, but the worker simulates a controlled failure: the task ends in `failed` instead of `completed`.\n\n`shouldFail` travels only in the queue payload and is never stored on the task — `GET /tasks/{id}` just shows `failed`. The id is saved as `{{failingTaskId}}`, so it never overwrites the happy-path `{{taskId}}`: run **Poll until terminal** twice (once per variable) or subscribe to it over the WebSocket to watch the failure path."
+          }
+        },
+        {
+          "name": "GET /tasks/{taskId} — read state",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.expect(pm.response.code).to.equal(200));",
+                  "",
+                  "const task = pm.response.json();",
+                  "pm.test('Task state shape', () => {",
+                  "  pm.expect(task.id).to.equal(pm.collectionVariables.get('taskId'));",
+                  "  pm.expect(task.status).to.be.oneOf(['pending', 'processing', 'completed', 'failed']);",
+                  "  pm.expect(task.progress).to.be.a('number').and.to.be.within(0, 100);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tasks/{{taskId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["tasks", "{{taskId}}"]
+            },
+            "description": "Single authoritative read: PostgreSQL is always the source of truth, so this works after API restarts, worker crashes, and client reconnects alike.\n\n`200 { \"id\": \"…\", \"status\": \"processing\", \"progress\": 42 }` — run **Create task** first so `{{taskId}}` is set. Unknown id → `404 { \"error\": \"not_found\" }`."
+          }
+        },
+        {
+          "name": "GET /tasks/{taskId} — poll until terminal",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const TERMINAL = ['completed', 'failed'];",
+                  "const POLL_MS = 1000;",
+                  "const MAX_POLLS = 120; // ~2 minutes",
+                  "",
+                  "const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));",
+                  "",
+                  "const fetchTask = () =>",
+                  "  new Promise((resolve, reject) => {",
+                  "    pm.sendRequest(pm.request, (error, response) => {",
+                  "      if (error) return reject(error);",
+                  "      resolve(response.json());",
+                  "    });",
+                  "  });",
+                  "",
+                  "async function pollUntilTerminal() {",
+                  "  const trail = [];",
+                  "  let task = pm.response.json();",
+                  "  pm.test('First read succeeded', () => pm.expect(pm.response.code).to.equal(200));",
+                  "  trail.push(`${task.status} ${task.progress}%`);",
+                  "",
+                  "  for (let i = 0; i < MAX_POLLS && !TERMINAL.includes(task.status); i++) {",
+                  "    await delay(POLL_MS);",
+                  "    task = await fetchTask();",
+                  "    trail.push(`${task.status} ${task.progress}%`);",
+                  "  }",
+                  "",
+                  "  pm.test(`Task ${task.id} reached a terminal state`, () => {",
+                  "    pm.expect(",
+                  "      TERMINAL.includes(task.status),",
+                  "      `still '${task.status}' after ${trail.length} samples`",
+                  "    ).to.be.true;",
+                  "  });",
+                  "  console.log(`Poll trail (${trail.length} samples): ${trail.join(' -> ')}`);",
+                  "}",
+                  "",
+                  "return pollUntilTerminal();"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tasks/{{taskId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["tasks", "{{taskId}}"]
+            },
+            "description": "**Polls once per second until the task finishes** (`completed` or `failed`), up to ~2 minutes — a single click of Send is enough. Works on plain Send: after the first HTTP read the script re-sends the same request via `pm.sendRequest` and returns a promise, so Postman waits for the whole poll to finish.\n\nWhat to watch:\n\n- The Console shows the full trail, e.g. `Poll trail (8 samples): pending 0% -> processing 0% -> processing 14% -> … -> completed 100%`.\n- If the task's duration outlasts MAX_POLLS the final test fails with `still 'processing' after N samples` — re-run it or raise the cap.\n\nVariations: run **Create failing task** and point this request's URL at `{{failingTaskId}}` to watch the trail end in `failed`. The same sequence, pushed live over the socket instead of polled, is the WebSocket item."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Error contract",
+      "item": [
+        {
+          "name": "POST /tasks — validation error (400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 400', () => pm.expect(pm.response.code).to.equal(400));",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.test('Stable error code and a field-level issue', () => {",
+                  "  pm.expect(body.error).to.equal('validation_failed');",
+                  "  pm.expect(body.issues).to.be.an('array').that.is.not.empty;",
+                  "  pm.expect(body.issues[0]).to.include.keys('path', 'message');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"duration\": 0\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["tasks"]
+            },
+            "description": "A deliberately invalid body — `duration: 0` is outside the documented 1–300 seconds. Expected response:\n\n```json\n{\n  \"error\": \"validation_failed\",\n  \"issues\": [\n    { \"path\": \"duration\", \"message\": \"…\" }\n  ]\n}\n```\n\nEvery 400 from the API uses this envelope: a stable `error` code plus per-field `issues`. Swap the body for `{ \"duration\": \"abc\" }`, `{}`, or invalid JSON to see the same shape with different issues."
+          }
+        },
+        {
+          "name": "GET /tasks/{taskId} — unknown task (404)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 404', () => pm.expect(pm.response.code).to.equal(404));",
+                  "",
+                  "const body = pm.response.json();",
+                  "pm.test('not_found error code', () => pm.expect(body.error).to.equal('not_found'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tasks/00000000-0000-4000-8000-000000000000",
+              "host": ["{{baseUrl}}"],
+              "path": ["tasks", "00000000-0000-4000-8000-000000000000"]
+            },
+            "description": "A well-formed UUID that no task has. Expected response: `404 { \"error\": \"not_found\" }`.\n\nNote the ordering guarantee: a syntactically invalid id (e.g. `not-a-uuid`) fails validation first with `400 validation_failed` — only well-formed unknown ids reach `404`."
+          }
+        }
+      ]
+    },
+    {
+      "name": "WebSocket",
+      "description": "The live update channel. Postman executes plain HTTP only — open the item below, press **Connect**, and paste the frames from its description into the message bar.",
+      "item": [
+        {
+          "name": "WS /ws — subscribe to task updates",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const taskId = pm.collectionVariables.get('taskId');",
+                  "if (!taskId) {",
+                  "  console.warn('taskId is not set yet — run \"POST /tasks — create task\" first; the frame in the description will resolve it.');",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrlWs}}/ws",
+              "host": ["{{baseUrlWs}}"],
+              "path": ["ws"]
+            },
+            "description": "Live task updates over WebSocket. HTTP runners cannot execute this — open the request, press **Connect**, then paste a frame below into the message bar and Send. `{{taskId}}` resolves inside the message box (it is set by **Create task**).\n\n**1 · Subscribe** (send exactly one per socket):\n\n```\n{\"type\":\"subscribe\",\"taskId\":\"{{taskId}}\"}\n```\n\n**2 · Expected sequence** — one sync frame, many progress frames, exactly one terminal frame, then silence:\n\n```\n{\"type\":\"state\",\"taskId\":\"…\",\"status\":\"pending\",\"progress\":0}\n{\"type\":\"progress\",\"taskId\":\"…\",\"progress\":1}\n{\"type\":\"progress\",\"taskId\":\"…\",\"progress\":2}\n…\n{\"type\":\"completed\",\"taskId\":\"…\"}\n```\n\nThe `state` frame is the database-authoritative snapshot — whatever you missed while disconnected is already reflected in it.\n\n**3 · Failure path** — create the failing task (saved as `{{failingTaskId}}`) and subscribe with:\n\n```\n{\"type\":\"subscribe\",\"taskId\":\"{{failingTaskId}}\"}\n```\n\n…same sequence, terminal frame is `{\"type\":\"failed\",\"taskId\":\"…\"}`.\n\n**4 · Error frames** — malformed input is answered as a value; the socket stays open:\n\n```\n{\"type\":\"subscribe\",\"taskId\":\"not-a-uuid\"}   ->  {\"type\":\"error\",\"error\":\"validation_failed\",\"issues\":[{\"path\":\"taskId\",\"message\":\"…\"}]}\n{\"type\":\"subscribe\",\"taskId\":\"00000000-0000-4000-8000-000000000000\"}  ->  {\"type\":\"error\",\"error\":\"not_found\"}\nsend the plain text  not json                   ->  {\"type\":\"error\",\"error\":\"validation_failed\",\"issues\":[{\"path\":\"\",\"message\":\"invalid JSON\"}]}\n```\n\n**5 · Recovery drill** — subscribe, close the socket mid-task, reconnect, subscribe again: the fresh `state` frame carries the current progress, so a client can never be stuck on a stale state. Processing itself never depended on the socket being open.\n\nAll frame schemas (`SubscribeMessage`, `TaskUpdate`, `ProtocolError`) are also registered in the OpenAPI document at {{baseUrl}}/docs."
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string",
+      "name": "baseUrl",
+      "description": "HTTP base URL of the AWTY API."
+    },
+    {
+      "key": "baseUrlWs",
+      "value": "ws://localhost:3000",
+      "type": "string",
+      "name": "baseUrlWs",
+      "description": "WebSocket base URL (ws:// or wss:// behind TLS). Kept separate from baseUrl because the ws:// scheme is required for the socket request."
+    },
+    {
+      "key": "taskId",
+      "value": "",
+      "type": "string",
+      "name": "taskId",
+      "description": "Filled automatically by 'POST /tasks — create task'."
+    },
+    {
+      "key": "failingTaskId",
+      "value": "",
+      "type": "string",
+      "name": "failingTaskId",
+      "description": "Filled automatically by 'POST /tasks — create failing task'."
+    }
+  ]
+}
